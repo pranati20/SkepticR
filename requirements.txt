@@ -1,0 +1,10 @@
+numpy
+scipy
+pandas
+statsmodels
+arch
+fastapi
+uvicorn[standard]
+pytest
+anthropic
+matplotlib
