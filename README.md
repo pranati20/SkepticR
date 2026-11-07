@@ -106,6 +106,10 @@ Raw data -> Cleaner -> Hunter swarm (+ Librarian) -> LEDGER
 * Measured failure modes: **Hidden confounders pass** (5 of 10 decoys declared DISCOVERY when VAL and MOM are hidden (vs 0 with full factors)); **Null-world validity depends on the null generator** (family-wise false alarm rate on pure noise with volatility regimes: 2% (nominal 5%)). See the Benchmark tab for all of them.
 <!--/BENCH-->
 
+* **Read the 0% FDR with care:** it is 0 false out of ~80 claimed discoveries (20 seeds x ~4). Zero observed does not mean zero error: the one-sided 95% upper bound on the false-discovery rate is about 3.7% (rule of three). More seeds would tighten it.
+* "Confidence" in the UI is an **evidence score (1 - Storey q-value)**, not a calibrated probability; it runs optimistic at the top (see Calibration).
+
+
 ## Repo layout
 ```
 skeptic/

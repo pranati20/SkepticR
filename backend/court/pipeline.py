@@ -84,7 +84,7 @@ class Court:
             pos = {int(i): j for j, i in enumerate(cum)}
             conf = J.confidence_scores(null.p_unadjusted)
             prior = float(np.mean([search.hyps[i].get("prior", 0.5) for i in batch])) if len(batch) else 0.5
-            level = ai.propose_level(prior) if cfg.use_alpha_investing else cfg.flat_alpha
+            level = ai.propose_level(prior, min_level=1.0 / (cfg.n_worlds + 1)) if cfg.use_alpha_investing else cfg.flat_alpha
             es = self.ledger.effective_search_size(run_id)
             es = {**es, "effective": max(es["effective"], len(cum))}
             obs_abs = np.abs(null.observed)

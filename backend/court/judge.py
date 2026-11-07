@@ -16,6 +16,10 @@ from . import power as P
 
 DISCOVERY, LUCK, CANT_TELL = "DISCOVERY", "LUCK", "CAN'T TELL YET"
 
+# most fundamental (invalidates the data/test itself) first; the verdict reports the first match
+KILL_PRIORITY = ["leakage", "survivorship", "simpson", "peeking", "placebo", "confounder", "concentration",
+                 "regime", "costs", "fragility"]
+
 CAUSE_OF_DEATH = {
     "multiple_comparisons": "Died of multiple comparisons",
     "leakage": "Died of leakage",
@@ -76,7 +80,11 @@ def qvalues(p: np.ndarray, pi0: float = 1.0) -> np.ndarray:
 
 
 def confidence_scores(p_unadj_emp: np.ndarray) -> np.ndarray:
-    """Calibrated-by-construction P(real): 1 - q-value computed from the empirical-null marginal p-values."""
+    """Evidence score = 1 - Storey q-value from the empirical-null marginal p-values.
+
+    This is NOT a calibrated probability that the finding is real: a q-value estimates the FDR of the
+    set of findings at least this extreme, so the score tends to be optimistic (see the calibration
+    table in the README benchmark: stated 0.88 vs actual 0.79). Use it for ranking, not as a probability."""
     pi0 = storey_pi0(p_unadj_emp)
     return 1.0 - qvalues(p_unadj_emp, pi0)
 
@@ -96,6 +104,7 @@ def judge_one(hyp_id: str, null, k: int, level: float, attacks: list[dict] | Non
                   n_null_worlds=null.n_worlds, attacks=attacks, statistic=float(null.observed[k]),
                   confession=confession(search["effective"], search["cleaning_choices"], p_rate))
     if killers:
+        killers.sort(key=lambda a: KILL_PRIORITY.index(a["attack"]) if a["attack"] in KILL_PRIORITY else len(KILL_PRIORITY))
         cause = CAUSE_OF_DEATH.get(killers[0]["attack"], f"Died of {killers[0]['attack']}")
         return Verdict(verdict=LUCK, confidence=min(confidence, 0.05), cause_of_death=cause, **common)
     if p_adj <= level:

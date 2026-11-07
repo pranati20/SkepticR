@@ -127,7 +127,7 @@ export function Detail({ s, id }: { s: RunState; id: string }) {
       <Banner tone={v.verdict === 'DISCOVERY' ? 'sky' : 'amber'}>“{v.confession}”</Banner>
       <div className="grid grid-cols-4 gap-3">
         <Stat label="Adj. p" value={fmt(v.p_adj, 3)} sub={`level ${fmt(v.level, 3)}`} />
-        <Stat label="Confidence" value={pct(v.confidence)} />
+        <Stat label="Evidence score (1-q, not a probability)" value={pct(v.confidence)} />
         <Stat label="Null worlds" value={v.n_null_worlds} />
         <Stat label="Search size" value={v.search_size} />
       </div>

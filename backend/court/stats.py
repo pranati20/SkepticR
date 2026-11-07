@@ -41,14 +41,16 @@ def alpha_t(pnl: np.ndarray, factors: np.ndarray) -> np.ndarray:
     K, T = pnl.shape
     X = np.column_stack([np.ones(T), factors])
     p = X.shape[1]
-    XtXi = np.linalg.inv(X.T @ X)
+    if T <= p:                                        # not enough rows to fit: no evidence, don't crash the run
+        return np.zeros(K)
+    XtXi = np.linalg.pinv(X.T @ X)                    # pinv: duplicated / constant factors are rank-deficient
     beta = XtXi @ (X.T @ pnl.T)                       # (p,K)
     resid = pnl.T - X @ beta
     s2 = (resid ** 2).sum(axis=0) / (T - p)
     t = beta[0] / np.sqrt(np.maximum(s2 * XtXi[0, 0], 1e-300))
     # a series that IS (a linear combination of) the factors has ~0 residual: its alpha is 0, not infinite
     ysd = pnl.std(axis=1)
-    t = np.where(np.sqrt(s2) < 1e-6 * np.maximum(ysd, 1e-300), 0.0, t)
+    t = np.where(np.sqrt(s2) < 1e-9 * np.maximum(ysd, 1e-300), 0.0, t)
     return t
 
 
@@ -68,7 +70,7 @@ def naive(p: np.ndarray, alpha: float = 0.05) -> np.ndarray:
 
 
 def bonferroni(p: np.ndarray, alpha: float = 0.05) -> np.ndarray:
-    return p * len(p) < alpha
+    return p * len(p) <= alpha                       # same boundary convention as BH (<=)
 
 
 def benjamini_hochberg(p: np.ndarray, q: float = 0.05) -> np.ndarray:

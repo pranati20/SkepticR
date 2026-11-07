@@ -36,9 +36,9 @@ def _win(n) -> int:
 
 def _lag(x, n):
     n = int(n)
-    if n < 0 or n > 250:
-        raise DSLError("lag must be in [0,250]")
-    return np.vstack([np.full((n, x.shape[1]), np.nan), x[: x.shape[0] - n]]) if n else x
+    if n < 0 or n > MAX_WINDOW:
+        raise DSLError(f"lag must be in [0,{MAX_WINDOW}]")
+    return np.vstack([np.full((n, x.shape[1]), np.nan), x[: x.shape[0] - n]]) if n else x.copy()
 
 
 def _lead(x, n):

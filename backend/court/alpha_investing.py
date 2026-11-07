@@ -25,11 +25,20 @@ class AlphaInvesting:
         self.wealth = self.wealth0
         self.history.append({"event": "init", "wealth": self.wealth})
 
-    def propose_level(self, prior: float = 0.5) -> float:
-        """Level alpha_j for the next test. prior in [0,1]; prior=0.5 -> factor 1."""
+    def propose_level(self, prior: float = 0.5, min_level: float = 0.0) -> float:
+        """Level alpha_j for the next test. prior in [0,1]; prior=0.5 -> factor 1.
+
+        `min_level` is the smallest p-value the null audit can resolve (1/(n_worlds+1)). Without a floor,
+        repeated failures shrink the level below that resolution and no test can ever reject again (a
+        "sterile lock"). With the floor the swarm can still win wealth back, at the price that when it is
+        nearly broke the mFDR guarantee is only approximate; such tests are marked `floored` in the history."""
         s = self.wealth * self.base_share * (0.5 + min(max(prior, 0.0), 1.0))
         s = min(s, self.wealth)                       # can never stake more than we hold
-        return s / (1.0 + s)                          # cost of failure = alpha/(1-alpha) = s
+        level = s / (1.0 + s)                         # cost of failure = alpha/(1-alpha) = s
+        if level < min_level:
+            self.history.append({"event": "floored", "level": level, "min_level": min_level, "wealth": self.wealth})
+            level = min_level
+        return level
 
     def update(self, level: float, rejected: bool, label: str = "") -> float:
         if rejected:
