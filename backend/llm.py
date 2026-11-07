@@ -32,7 +32,7 @@ ROLE_MODELS = {
     "report": "claude-sonnet-5-5",
 }
 # USD per 1M tokens (input, output). ESTIMATES for the cost meter; edit to match your price sheet.
-PRICES = {"claude-haiku-5-5": (1.0, 5.0), "claude-sonnet-5-5": (3.0, 15.0), "mock": (0.0, 0.0)}
+PRICES = {"claude-haiku-5-5": (1.0, 5.0), "claude-sonnet-5-5": (3.0, 15.0), "gemini-4-argon": (0.0, 0.0), "mock": (0.0, 0.0)}      # Argon price unknown: cost meter shows $0 until you set it
 
 CACHE_DIR = Path(os.environ.get("SKEPTIC_LLM_CACHE", Path(__file__).resolve().parents[1] / ".llm_cache"))
 
@@ -121,6 +121,30 @@ class AnthropicProvider:
         return text, msg.usage.input_tokens, msg.usage.output_tokens
 
 
+class GeminiProvider:
+    """Gemini 4 Argon (gemini-4-argon) via the Gemini `generateContent` REST API. Key: ARGON_API_KEY.
+
+    ASSUMPTION (unverified without a key): the endpoint is Google's Gemini API shape. If Argon is served from a different
+    gateway, set ARGON_BASE_URL (default https://generativelanguage.googleapis.com/v1beta) and ARGON_MODEL."""
+    name = "gemini"
+
+    def __init__(self, api_key: str | None = None):
+        self.key = api_key or os.environ["ARGON_API_KEY"]
+        self.base = os.environ.get("ARGON_BASE_URL", "https://generativelanguage.googleapis.com/v1beta").rstrip("/")
+
+    def complete(self, model: str, system: str, prompt: str, max_tokens: int) -> tuple[str, int, int]:
+        import urllib.request
+        body = {"systemInstruction": {"parts": [{"text": system}]}, "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                "generationConfig": {"maxOutputTokens": max_tokens, "responseMimeType": "application/json"}}
+        req = urllib.request.Request(f"{self.base}/models/{model}:generateContent", data=json.dumps(body).encode(),
+                                     headers={"Content-Type": "application/json", "x-goog-api-key": self.key})
+        with urllib.request.urlopen(req, timeout=120) as r:
+            d = json.loads(r.read().decode())
+        text = "".join(p.get("text", "") for p in d["candidates"][0]["content"]["parts"])
+        u = d.get("usageMetadata", {})
+        return text, int(u.get("promptTokenCount", 0)), int(u.get("candidatesTokenCount", 0))
+
+
 class MockLLM:
     """Deterministic offline provider. Role handlers receive the structured `hint` and return schema-valid JSON.
     Hunters etc. pass a hint dict; the mock never parses prose, so it is robust and reproducible."""
@@ -137,7 +161,14 @@ class LLM:
     def __init__(self, provider: Any | None = None, meter: TokenMeter | None = None, cache_dir: Path | None = None,
                  use_cache: bool = True, max_retries: int = 3):
         if provider is None:
-            provider = AnthropicProvider() if os.environ.get("ANTHROPIC_API_KEY") and os.environ.get("SKEPTIC_USE_LLM") else MockLLM()
+            want = os.environ.get("SKEPTIC_USE_LLM")
+            pick = os.environ.get("SKEPTIC_LLM_PROVIDER", "").lower()     # "gemini" | "anthropic" (default: whichever key exists, Argon first)
+            if want and os.environ.get("ARGON_API_KEY") and pick in ("", "gemini"):
+                provider = GeminiProvider()
+            elif want and os.environ.get("ANTHROPIC_API_KEY") and pick in ("", "anthropic"):
+                provider = AnthropicProvider()
+            else:
+                provider = MockLLM()
         self.provider = provider
         self.meter = meter or TokenMeter()
         self.cache_dir = Path(cache_dir) if cache_dir else CACHE_DIR
@@ -157,7 +188,12 @@ class LLM:
 
     def complete_json(self, role: str, system: str, prompt: str, schema: dict | None = None,
                       mock_hint: dict | None = None, max_tokens: int = 2000) -> tuple[Any, Usage]:
-        model = "mock" if self.is_mock else ROLE_MODELS.get(role, "claude-sonnet-5-5")
+        if self.is_mock:
+            model = "mock"
+        elif isinstance(self.provider, GeminiProvider):
+            model = os.environ.get("ARGON_MODEL", "gemini-4-argon")        # one flagship model for every role
+        else:
+            model = ROLE_MODELS.get(role, "claude-sonnet-5-5")
         if self.is_mock:
             handler = self.provider.handlers.get(role)
             if handler is None:

@@ -128,3 +128,28 @@ def test_dotenv_loader(tmp_path, monkeypatch):
     B._load_dotenv()
     assert os.environ["SKEPTIC_TEST_KEY"] == "abc" and "EMPTY" not in os.environ
     monkeypatch.delenv("SKEPTIC_TEST_KEY", raising=False)
+
+
+def test_gemini_provider_request_and_parse(monkeypatch):
+    import io
+    import json as J
+    import urllib.request
+    from skeptic.backend import llm as L
+    seen = {}
+
+    class R(io.BytesIO):
+        __enter__ = lambda s: s
+        __exit__ = lambda s, *a: None
+
+    def fake(req, timeout=0):
+        seen["url"], seen["key"], seen["body"] = req.full_url, req.headers.get("X-goog-api-key"), J.loads(req.data)
+        return R(J.dumps({"candidates": [{"content": {"parts": [{"text": '{"ok": true}'}]}}],
+                          "usageMetadata": {"promptTokenCount": 7, "candidatesTokenCount": 3}}).encode())
+    monkeypatch.setattr(urllib.request, "urlopen", fake)
+    monkeypatch.setenv("ARGON_API_KEY", "k")
+    monkeypatch.setenv("SKEPTIC_USE_LLM", "1")
+    llm = L.LLM(use_cache=False)
+    assert isinstance(llm.provider, L.GeminiProvider)
+    obj, u = llm.complete_json("judge", "sys", "prompt")
+    assert obj == {"ok": True} and (u.tokens_in, u.tokens_out) == (7, 3) and u.model == "gemini-4-argon"
+    assert seen["url"].endswith("/models/gemini-4-argon:generateContent") and seen["key"] == "k"
