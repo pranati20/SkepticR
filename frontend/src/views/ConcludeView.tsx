@@ -28,7 +28,16 @@ function Conclusion({ c }: { c: any }) {
         </span>
       </div>
       <div className="text-xs text-mute">Your question: “{c.question}”</div>
-      <div className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-100">{c.text}</div>
+      {c.answer && (
+        <div className="mt-3 rounded-xl border border-accent/40 bg-accent/10 p-3">
+          <div className="h-label mb-1">Answer to your question</div>
+          <div className="text-base leading-relaxed text-white">{c.answer}</div>
+        </div>
+      )}
+      <details className="mt-3" open={!c.answer}>
+        <summary className="cursor-pointer text-xs text-mute">Detailed write-up</summary>
+        <div className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-100">{c.text}</div>
+      </details>
       {c.findings.length > 0 && (
         <div className="mt-4">
           <div className="h-label mb-1">Valid findings used (the only ones the conclusion is based on)</div>

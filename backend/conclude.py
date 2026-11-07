@@ -22,7 +22,7 @@ SYSTEM = ("You write the conclusion of a data analysis that has ALREADY been aud
           "and a numbered list of VALID FINDINGS: the only results that survived every statistical check. "
           "Rules: answer the question using ONLY these findings and cite them as [F1], [F2]. Never mention, guess or imply any result that is not listed. "
           "Do not invent numbers, causes or links. Say whether the findings fully, partly or do not answer the question. "
-          "These are statistical findings, not proof of causation and not investment or medical advice; say so briefly. Be concise and plain. "
+          "These are statistical findings, not proof of causation and not investment or medical advice; say so briefly. Be concise and plain. Begin with \"Short answer:\" and one plain-English sentence that answers the QUESTION directly. "
           "Reply with JSON only: {\"text\": \"...\"}.")
 SCHEMA = {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}
 
@@ -60,6 +60,51 @@ def facts(events: list[dict]) -> dict:
             "top_causes": [k for k, _ in causes.most_common(3)], "data": {"treat": pan.get("treat"), "outcomes": pan.get("outcomes")}}
 
 
+def _segment(fid: str) -> tuple[str, str]:
+    """'conversion|device=mobile' -> ('conversion', 'device=mobile'); 'bet|all predicted bets' -> ('bet', 'all predicted bets')."""
+    o, _, s = fid.partition("|")
+    return o, s
+
+
+def _words(seg: str) -> str:
+    return seg.replace("&", "and").replace("=", " = ")
+
+
+def plain_answer(question: str, f: dict) -> str:
+    """A short plain-English answer to the user's own question, built only from the valid findings (no model, fully checkable)."""
+    fs = f["findings"]
+    q = f'"{question}"' if question else "your question"
+    if not fs:
+        return (f"Short answer: we cannot say. The data does not give a reliable answer to {q}. Everything we found either looked like luck or bias "
+                f"or had too little data. More data, or a more specific question, may help.")
+    treat = (f.get("data") or {}).get("treat")
+    by_outcome: dict = {}
+    for x in fs:
+        o, s = _segment(x["id"])
+        by_outcome.setdefault(o, []).append((s, x))
+    parts = []
+    for o, items in list(by_outcome.items())[:3]:
+        overall = [x for s, x in items if s in ("overall", "all predicted bets")]
+        segs = [s for s, _ in items if s not in ("overall", "all predicted bets")]
+        dirs = {x["direction"] for _, x in items if x["direction"]}
+        d = (" (" + ("higher" if dirs == {"treated group higher"} else "lower" if dirs == {"treated group lower"} else "in different directions") +
+             (f" for the {treat} group" if treat else "") + ")") if dirs else ""
+        s_txt = ""
+        if overall:
+            s_txt = f"a real effect on {o}{d} that holds overall"
+        if segs:
+            shown = ", ".join(_words(s) for s in segs[:4]) + (f" and {len(segs) - 4} more groups" if len(segs) > 4 else "")
+            s_txt += (" and " if s_txt else f"a real effect on {o}{d} ") + f"within: {shown}"
+        parts.append(s_txt)
+    more = f" ({len(by_outcome) - 3} more outcomes also held up)" if len(by_outcome) > 3 else ""
+    strongest = max(x["evidence"] for x in fs)
+    skip = f["n_luck"] + f["n_unclear"]
+    return (f"Short answer: yes, in part. Of {f['n_tested']} things tried to answer {q}, {len(fs) if f['n_valid_total'] <= len(fs) else f['n_valid_total']} held up after "
+            f"every check. The data supports " + "; and ".join(parts) + more + f". Strongest evidence is about {strongest * 100:.0f}% that it is not luck. "
+            f"The other {skip} things tried (including any headline that looked impressive at first) did not hold up, so we do not claim them. "
+            "This shows an association in this data, not proof of cause, and it is not advice.")
+
+
 def _sanitize(text: str, n: int) -> str:
     text = re.sub(r"\[F(\d+)\]", lambda m: m.group(0) if 1 <= int(m.group(1)) <= n else "", text)
     return re.sub(r"https?://\S+", "", text).strip()
@@ -70,7 +115,7 @@ def conclude(question: str, events: list[dict], llm: LLM | None = None) -> dict:
     f = facts(events)
     fs = f["findings"]
     base = {"question": question, "findings": fs, "n_valid": f["n_valid_total"], "n_tested": f["n_tested"], "n_luck": f["n_luck"],
-            "n_unclear": f["n_unclear"], "top_causes": f["top_causes"]}
+            "n_unclear": f["n_unclear"], "top_causes": f["top_causes"], "answer": plain_answer(question, f)}
     if not fs:
         why = f"{f['n_luck']} looked like luck or bias and {f['n_unclear']} had too little data to judge"
         return {**base, "status": "none", "llm": "none",
