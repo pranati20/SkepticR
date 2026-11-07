@@ -225,6 +225,22 @@ export default function CourtView({ s, compact = false }: { s: RunState; compact
           {audit && <div className="mt-2 text-xs">Current level to beat: <span className="font-mono text-accent">{fmt(audit.level, 3)}</span></div>}
         </Card>}
       </div>
+      {s.methods && Object.values(s.methods.papers || {}).some((a: any) => a.length) && (
+        <Card title="Methods scout (OpenAlex): validated papers behind the Prosecutors">
+          <div className="space-y-2">
+            {Object.entries(s.methods.papers).filter(([, ps]: any) => ps.length).map(([area, ps]: any) => (
+              <div key={area}>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-sky-300">{area}</div>
+                {ps.map((p: any, i: number) => (
+                  <div key={i} className="text-xs text-slate-300">📄 {p.authors} ({p.year}) — <a href={p.url} target="_blank" rel="noreferrer" className="text-sky-300 underline">{p.title}</a>
+                    <span className="text-mute"> · {p.venue} · {p.cited_by} citations · peer-reviewed ✓ abstract ✓ on-topic ✓</span></div>
+                ))}
+              </div>
+            ))}
+            <div className="text-[11px] text-mute">Valid = peer-reviewed article, has abstract, on-topic, 30+ citations (checked from the OpenAlex record; we do not verify the maths).</div>
+          </div>
+        </Card>
+      )}
       {tech && <Card title="Ledger"><LedgerTicker s={s} /></Card>}
       <div className="grid gap-4 xl:grid-cols-3">
         <Card title="Results" className={tech ? 'xl:col-span-1' : 'xl:col-span-3'}>

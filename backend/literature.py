@@ -138,14 +138,12 @@ def _abstract(inv: dict | None) -> str:
 
 def openalex(query: str, rows: int = 5, timeout: float = 10.0) -> list[dict]:
     """Live OpenAlex search (title, authors, year, DOI, venue, abstract, citation count). Needs OPENALEX_API_KEY."""
-    key = os.environ.get("OPENALEX_API_KEY")
-    if not key:
-        raise RuntimeError("OPENALEX_API_KEY not set")
+    key = os.environ.get("OPENALEX_API_KEY")           # optional: OpenAlex also answers keyless (lower rate limit)
 
     def fetch():
         url = "https://api.openalex.org/works?" + urllib.parse.urlencode(
-            {"search": query, "per-page": rows, "api_key": key,
-             "select": "title,authorships,publication_year,doi,primary_location,abstract_inverted_index,cited_by_count,id"})
+            {"search": query, "per-page": rows, **({"api_key": key} if key else {}),
+             "select": "title,authorships,publication_year,doi,primary_location,abstract_inverted_index,cited_by_count,id,type"})
         out = []
         for it in json.loads(_get(url, timeout).decode())["results"]:
             names = [a["author"]["display_name"] for a in it.get("authorships", [])]
@@ -153,7 +151,7 @@ def openalex(query: str, rows: int = 5, timeout: float = 10.0) -> list[dict]:
             out.append({"title": html.unescape(it.get("title") or ""), "authors": au, "year": it.get("publication_year"), "doi": it.get("doi"),
                         "url": it.get("doi") or it.get("id"), "venue": ((it.get("primary_location") or {}).get("source") or {}).get("display_name") or "",
                         "abstract": _abstract(it.get("abstract_inverted_index"))[:600], "cited_by": it.get("cited_by_count"),
-                        "source": "OpenAlex (live)"})
+                        "type": it.get("type"), "source": "OpenAlex (live)"})
         return out
     return _cached("openalex2", f"{query}|{rows}", fetch)
 
@@ -289,3 +287,45 @@ def literature_attack_factory(evidence: dict[str, dict]):
             "observed_sharpe": sr, "papers": [{k2: p[k2] for k2 in ("authors", "year", "title", "applicability", "url", "source") if k2 in p} for p in ev.get("papers", [])[:3]],
             "expected_post_publication_haircut": hc, "caveats": ev.get("caveats", []), "notes": notes}}
     return literature
+
+
+# ---------------------------------------------------------------- Methods Scout: papers that improve the CRITIQUING itself
+METHOD_QUERIES = {
+    "multiple testing / data snooping": ("data snooping reality check multiple testing backtest", ("snooping", "multiple testing", "false discovery", "reality check", "backtest")),
+    "leakage / lookahead": ("look-ahead bias data leakage backtest overfitting", ("look-ahead", "lookahead", "leakage", "overfitting", "backtest")),
+    "survivorship": ("survivorship bias stock returns database", ("survivorship", "survivor")),
+    "costs / capacity": ("transaction costs anomalies trading profitability", ("transaction cost", "trading cost", "anomal")),
+    "factors / beta": ("factor model alpha anomalies cross-section of returns", ("factor", "anomal", "cross-section")),
+    "post-publication decay": ("anomaly returns after publication decay", ("publication", "anomal", "replicat")),
+    "peeking / sequential testing": ("optional stopping sequential testing false positives", ("sequential", "stopping", "peeking", "false positive")),
+}
+
+
+def validate_method_paper(p: dict, must: tuple[str, ...], min_cites: int = 30) -> dict | None:
+    """A methods paper counts as VALID only if it passes checks computed from the API record (we cannot verify its maths):
+    peer-reviewed article (not a preprint), has an abstract, on-topic, and is established (citations). Returns the checks, or None."""
+    text = (p["title"] + " " + (p.get("abstract") or "")).lower()
+    checks = {"peer_reviewed": (p.get("type") == "article") and bool(p.get("venue")), "has_abstract": len(p.get("abstract") or "") > 80,
+              "on_topic": any(m in text for m in must), "established": (p.get("cited_by") or 0) >= min_cites}
+    return checks if all(checks.values()) else None
+
+
+def methods_scout(online: bool = True, per_attack: int = 2) -> dict:
+    """OpenAlex search for papers that could sharpen each Prosecutor. Returns {"papers": {area: [paper+checks]}, "status": [...]}.
+    Never fabricates: offline or on failure it returns nothing and says so."""
+    out, status = {}, []
+    if not online:
+        return {"papers": {}, "status": ["offline: methods scout not run"]}
+    for area, (q, must) in METHOD_QUERIES.items():
+        try:
+            found = []
+            for p in openalex(q, 10):
+                chk = validate_method_paper(p, must)
+                if chk:
+                    found.append({k: p.get(k) for k in ("title", "authors", "year", "venue", "url", "doi", "cited_by", "source")} | {"checks": chk})
+            found.sort(key=lambda x: -(x["cited_by"] or 0))
+            out[area] = found[:per_attack]
+            status.append(f"{area}: {len(out[area])} validated of 10 returned")
+        except Exception as e:  # noqa: BLE001
+            status.append(f"{area}: OpenAlex unavailable ({str(e)[:50] or type(e).__name__})")
+    return {"papers": out, "status": status}

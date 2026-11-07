@@ -201,6 +201,9 @@ def _librarian(ctx: Ctx, search: Search):
             ctx.emit("literature", family=fam, scenario={"start_year": sc.start_year, "end_year": sc.end_year, "universe": sc.universe, "survivor_universe": sc.survivor_universe},
                      papers=top, has_direct_support=ev["has_direct_support"], expected_haircut=ev["expected_haircut"], caveats=ev["caveats"],
                      live=lib.online, search_status=list(lib.status))
+    ms = LIT.methods_scout(lib.online)
+    ctx.emit("agent", agent="Librarian", text="Methods scout (OpenAlex): " + "; ".join(ms["status"][:3]) + ("…" if len(ms["status"]) > 3 else ""))
+    ctx.emit("methods", **ms, live=lib.online)
     search.literature = evid
     search.extra_attack_fns = (search.extra_attack_fns or []) + [LIT.literature_attack_factory(evid)]
 

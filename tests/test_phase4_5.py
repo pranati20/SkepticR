@@ -114,3 +114,13 @@ def test_librarian_finds_applicable_papers_and_feeds_prosecutor(monkeypatch):
         pnl = np.random.default_rng(0).normal(0.004, 0.01, (1, 800))
     r = LIT.literature_attack_factory({"x": none})(S, 0, None)
     assert r["attack"] == "literature" and r["severity"] == "medium" and not r["survived"]
+
+
+def test_methods_scout_validates_and_never_fabricates(monkeypatch):
+    from skeptic.backend import literature as L
+    good = {"title": "Data snooping and the reality check", "abstract": "x " * 60 + "backtest multiple testing", "type": "article", "venue": "Econometrica", "cited_by": 900, "authors": "White", "year": 2000, "url": "u", "doi": "d", "source": "OpenAlex (live)"}
+    bad = [{**good, "type": "preprint", "title": "a"}, {**good, "cited_by": 2, "title": "b"}, {**good, "abstract": "", "title": "c"}, {**good, "title": "d", "abstract": "y " * 60}]
+    monkeypatch.setattr(L, "openalex", lambda q, rows=5, timeout=10: [good] + bad)
+    r = L.methods_scout(True)
+    assert all(len(v) == 1 and v[0]["title"] == good["title"] for v in r["papers"].values() if v)
+    assert L.methods_scout(False)["papers"] == {}
