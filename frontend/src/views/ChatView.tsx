@@ -25,7 +25,7 @@ function SourceCard({ s, n }: { s: Source; n: number }) {
   )
 }
 
-export default function ChatView() {
+export default function ChatView({ onAudit }: { onAudit?: (question: string, sources: Source[]) => void }) {
   const [msgs, setMsgs] = useState<Msg[]>([])
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
@@ -71,6 +71,12 @@ export default function ChatView() {
                 <div className="mt-3 space-y-1.5">
                   <div className="h-label">Sources found ({m.sources.length}) · click to open</div>
                   {m.sources.map((s, j) => <SourceCard key={s.url} s={s} n={j + 1} />)}
+                  {onAudit && m.sources.some((s) => s.kind === 'paper') && (
+                    <div className="mt-2 rounded-lg border border-accent/40 bg-accent/5 p-2">
+                      <button className="btn-primary" onClick={() => onAudit(msgs.slice(0, i).reverse().find((x) => x.role === 'user')?.content || '', m.sources!)}>Send to “Watch it work” →</button>
+                      <div className="mt-1 text-[11px] text-mute">Runs a real audit on the idea in your question and hands these papers to the Prosecutors as evidence.</div>
+                    </div>
+                  )}
                 </div>
               )}
               {m.role === 'assistant' && m.llm && (

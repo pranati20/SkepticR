@@ -212,6 +212,7 @@ class Librarian:
     online: bool = field(default_factory=lambda: os.environ.get("SKEPTIC_OFFLINE") != "1")
     cache: dict = field(default_factory=dict)
     status: list = field(default_factory=list)       # per-source live-search notes, surfaced in the UI
+    extra: list = field(default_factory=list)        # papers the user's chat already found (real search results), offered to every claim
 
     def find(self, text: str, family: str | None = None, top: int = 3) -> list[dict]:
         key = (text, family)
@@ -230,7 +231,22 @@ class Librarian:
             for rel, p in [x for x in ranked if x[0] >= 2][:top]:
                 found.append({**p, "id": p.get("doi") or p["url"], "claim": (p.get("abstract") or "")[:240] or "(no abstract returned: open the link)",
                               "sample": None, "universe": None, "relevance": round(rel, 1), **assess_live(p, self.scenario)})
-        if not self.online:
+        if self.extra:                                       # papers from the user's chat: judged by the same relevance rule, no finance filter
+            query = FAMILY_QUERY.get(family or "", "") or " ".join(_terms(text)[:8])
+            terms = _terms(query)
+            have = {(p.get("url") or p["title"]).lower() for p in found}
+            for p in self.extra:
+                if (p.get("url") or p["title"]).lower() in have:
+                    continue
+                rel = _live_relevance(p, terms)
+                if rel >= 2:
+                    found.append({**p, "id": p.get("url") or p["title"], "from_chat": True,
+                                  "claim": (p.get("abstract") or "")[:240] or "(no abstract: open the link)", "sample": None, "universe": None,
+                                  "relevance": round(rel, 1), **assess_live(p, self.scenario)})
+            found.sort(key=lambda p: -p["relevance"])
+            found = found[:top + 2]
+            self.status = self.status + [f"{len(self.extra)} paper(s) carried over from your chat"]
+        if not self.online and not self.extra:
             self.status = ["offline (SKEPTIC_OFFLINE=1): no papers searched"]
         self.cache[key] = found
         try:

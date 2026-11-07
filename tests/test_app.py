@@ -237,3 +237,18 @@ def test_library_records_and_lists(monkeypatch):
     e = [x for x in d["looked_at"] if x["url"] == "https://doi.org/10.1/a"][0]
     assert e["uses"] == 2 and len(e["contexts"]) == 2 and "reference" not in d
     assert client.get("/api/benchmark").status_code in (200, 404) and client.post("/api/nullrerun", json={}).status_code in (404, 405)
+
+
+def test_chat_context_steers_run_and_reaches_prosecutors(monkeypatch):
+    from skeptic.backend import runner as R, literature as LIT
+    monkeypatch.setattr(LIT, "live_search", lambda q, n=6: ([], ["none"]))
+    ctx = {"question": "Does short-term reversal work in stocks?",
+           "papers": [{"kind": "paper", "title": "Short-term reversal in stock returns", "by": "A. Lee", "year": 2005, "url": "https://doi.org/10.1/r",
+                       "snippet": "Short-term reversal of stock returns after one week", "source": "OpenAlex"},
+                      {"kind": "dataset", "title": "ignored dataset", "url": "https://x"}]}
+    assert len(R.clean_context(ctx)["papers"]) == 1 and R.clean_context("junk") is None
+    ev, out = R.run_scenario("market", {"n_worlds": 60, "rounds": 1, "per_hunter": 4, "context": ctx})
+    fams = {e["family"] for e in ev if e["type"] == "proposal"}
+    assert fams == {"mean_reversion"}                                   # question steered the hunters
+    lits = [e for e in ev if e["type"] == "literature"]
+    assert lits and any(p.get("from_chat") for e in lits for p in e["papers"])   # chat paper reached the Librarian evidence

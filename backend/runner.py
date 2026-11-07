@@ -59,6 +59,7 @@ class Ctx:
         self.ledger = Ledger()
         self.run_id = self.ledger.start_run("run", {"seed": seed})
         self.seed = seed
+        self.context: dict | None = None                                    # question + papers sent from the chat tab
         self.online_literature = os.environ.get("SKEPTIC_OFFLINE") != "1"   # live paper search by default
         self.llm.meter.listeners.append(lambda snap: self.emit("tokens", **snap))
 
@@ -92,6 +93,40 @@ def _search_ledger_event(ctx: Ctx):
     ctx.emit("ledger", **ctx.ledger.effective_search_size(ctx.run_id), by_agent=ctx.ledger.by_agent(ctx.run_id))
 
 
+_FAMILY_WORDS = {"momentum": ("momentum", "winner", "trend"), "mean_reversion": ("revers", "mean-revert", "mean revert", "contrarian", "overreact"),
+                 "calendar": ("calendar", "seasonal", "weekday", "day-of-week", "january", "turn-of-the-month", "anomal"),
+                 "volatility": ("volatil", "low-vol", "idiosyncratic"), "fundamentals": ("value", "book-to-market", "fundamental", "quality", "profitab"),
+                 "volume_sentiment": ("volume", "sentiment", "liquidity", "turnover")}
+
+
+def clean_context(c) -> dict | None:
+    """Validate the chat hand-off. Only real search results (title + link) are accepted; everything is length-capped."""
+    if not isinstance(c, dict):
+        return None
+    papers = []
+    for p in (c.get("papers") or [])[:12]:
+        if isinstance(p, dict) and p.get("kind", "paper") == "paper" and isinstance(p.get("title"), str) and p["title"].strip():
+            papers.append({"title": p["title"][:300], "authors": str(p.get("by") or p.get("authors") or "")[:200], "year": p.get("year"),
+                           "venue": str(p.get("venue") or "")[:120], "url": str(p.get("url") or "")[:400] or None,
+                           "abstract": str(p.get("snippet") or p.get("abstract") or "")[:600], "source": str(p.get("source") or "chat")[:60] + " (from your chat)",
+                           "cited_by": p.get("cited_by")})
+    q = str(c.get("question") or "")[:300]
+    return {"question": q, "papers": papers} if (q or papers) else None
+
+
+def _families_for(ctx: Ctx, defaults: list[str]) -> list[str]:
+    """If the user came from the chat, test the strategy families their question / papers are about (else all defaults)."""
+    if not ctx.context:
+        return defaults
+    text = (ctx.context["question"] + " " + " ".join(p["title"] for p in ctx.context["papers"])).lower()
+    hit = [f for f in defaults if any(w in text for w in _FAMILY_WORDS.get(f, ()))]
+    if hit:
+        ctx.emit("agent", agent="Hunters", text=f"From your chat question I will test these idea families: {', '.join(hit)}")
+        return hit
+    ctx.emit("agent", agent="Hunters", text="Your question did not name a specific idea family, so all families are tested")
+    return defaults
+
+
 def _hunt(ctx: Ctx, families: list[str], rounds: int, per: int, fields: set | None) -> list[dict]:
     seen: set[str] = set()
     hyps: list[dict] = []
@@ -123,7 +158,7 @@ def run_market(ctx: Ctx, params: dict, real: bool = False) -> dict:
     clean_panel, rep = CL.clean(panel, ctx.llm, ctx.ledger, ctx.run_id, search_end=panel.shape[0] - holdout, seed=ctx.seed)
     ctx.emit("data_quality", **{k: v for k, v in rep.items() if k != "profile"}, profile=rep["profile"])
     _search_ledger_event(ctx)
-    fams = H.FAMILIES if not real else ["momentum", "mean_reversion", "calendar", "volatility", "volume_sentiment"]
+    fams = _families_for(ctx, list(H.FAMILIES) if not real else ["momentum", "mean_reversion", "calendar", "volatility", "volume_sentiment"])
     fields = None if not real else {"close", "ret", "volume"}
     rounds, per = int(params.get("rounds", 4)), int(params.get("per_hunter", 12))
     hyps = _hunt(ctx, fams, rounds, per, fields)
@@ -152,7 +187,7 @@ def _librarian(ctx: Ctx, search: Search):
     """Librarian: find papers per hypothesis family, check they APPLY to this scenario, hand the evidence to the Prosecutors."""
     dates = search.dates
     sc = LIT.Scenario.from_meta(search.meta, dates, n_assets=int(search.meta.get("n_assets", 117 if search.meta.get("survivorship_bias") else 150)))
-    lib = LIT.Librarian(sc, online=bool(ctx.online_literature))
+    lib = LIT.Librarian(sc, online=bool(ctx.online_literature), extra=(ctx.context or {}).get("papers", []))
     ctx.emit("agent", agent="Librarian", text=f"Searching the literature ({'LIVE: OpenAlex + Crossref + arXiv' if lib.online else 'offline: no papers searched'}) and checking it against this scenario ({sc.start_year}-{sc.end_year}, {sc.universe})")
     evid, per_family = {}, {}
     for h in search.hyps:
@@ -364,6 +399,7 @@ SCENARIOS = {"market": lambda c, p: run_market(c, p, False), "equities": lambda 
 def run_scenario(name: str, params: dict | None = None, emit: Callable[[dict], None] | None = None, seed: int = 0) -> tuple[list[dict], dict]:
     params = params or {}
     ctx = Ctx(emit, seed)
+    ctx.context = clean_context(params.get("context"))
     try:
         out = SCENARIOS[name](ctx, params)
     except Exception as e:                                   # surface to the UI; never hang a live run

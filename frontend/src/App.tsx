@@ -27,7 +27,19 @@ export default function App() {
   const [tab, setTab] = useState<(typeof TABS)[number][0]>('ask')
   const [scenario, setScenario] = useState('market')
   const [mode, setMode] = useState<'demo' | 'live'>('demo')
-  const go = () => (mode === 'demo' ? run.demo(scenario) : run.live(scenario))
+  const [chatCtx, setChatCtx] = useState<{ question: string; papers: any[] } | null>(null)
+  const go = () => (mode === 'demo' ? run.demo(scenario) : run.live(scenario, chatCtx ? { context: chatCtx } : {}))
+  const pickScenario = (t: string) => {
+    t = t.toLowerCase()
+    return /\b(bet|betting|odds|sportsbook|sports)\b/.test(t) ? 'betting' : /a\/b|peeking|conversion|experiment/.test(t) ? 'ab_test'
+      : /patient|treatment|supplement|clinical|health/.test(t) ? 'health' : 'market'
+  }
+  const auditFromChat = (question: string, sources: any[]) => {
+    const ctx = { question, papers: sources.filter((s) => s.kind === 'paper') }
+    const sc = pickScenario(question + ' ' + ctx.papers.map((p) => p.title).join(' '))
+    setChatCtx(ctx); setScenario(sc); setMode('live'); setTab('court')
+    run.live(sc, { context: ctx })
+  }
   const showControls = tab === 'court' || tab === 'split'
   return (
     <div className="mx-auto max-w-[1500px] px-4 pb-16 pt-4">
@@ -46,6 +58,16 @@ export default function App() {
 
       {showControls && (
         <div className="card mb-4 flex flex-wrap items-center gap-3 p-3">
+          {chatCtx && (
+            <div className="flex w-full items-start gap-2 rounded-lg border border-accent/40 bg-accent/5 p-2 text-xs text-slate-200">
+              <div className="flex-1">
+                <b>Using your chat:</b> “{chatCtx.question.slice(0, 120)}” · {chatCtx.papers.length} paper(s) will be given to the Prosecutors as evidence, and the AI will test the idea types your question mentions.
+                {scenario !== 'market' && scenario !== 'synthetic' && scenario !== 'equities' && <div className="text-amber-300">This example isn’t about stocks, so the papers are shown but not used in the checks.</div>}
+                {mode === 'demo' && <div className="text-amber-300">“Quick replay” ignores your chat. Switch to “Run for real” under Options.</div>}
+              </div>
+              <button className="btn px-2 py-0.5" onClick={() => setChatCtx(null)}>✕ remove</button>
+            </div>
+          )}
           <span className="text-sm text-slate-300">1. Pick an example</span>
           <select value={scenario} onChange={(e) => setScenario(e.target.value)} className="btn">{SCENARIOS.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}</select>
           <span className="text-sm text-slate-300">2.</span>
@@ -66,7 +88,7 @@ export default function App() {
         </div>
       )}
 
-      <div hidden={tab !== 'ask'}><ChatView /></div>
+      <div hidden={tab !== 'ask'}><ChatView onAudit={auditFromChat} /></div>
       {tab === 'court' && <CourtView s={s} />}
       {tab === 'split' && <SplitView s={s} />}
       {tab === 'papers' && <PapersView />}
