@@ -153,14 +153,16 @@ def _librarian(ctx: Ctx, search: Search):
     dates = search.dates
     sc = LIT.Scenario.from_meta(search.meta, dates, n_assets=int(search.meta.get("n_assets", 117 if search.meta.get("survivorship_bias") else 150)))
     lib = LIT.Librarian(sc, online=bool(ctx.online_literature))
-    ctx.emit("agent", agent="Librarian", text=f"Searching the literature ({'LIVE: Crossref + arXiv' if lib.online else 'offline, curated index only'}) and checking it against this scenario ({sc.start_year}-{sc.end_year}, {sc.universe})")
+    ctx.emit("agent", agent="Librarian", text=f"Searching the literature ({'LIVE: OpenAlex + Crossref + arXiv' if lib.online else 'offline: no papers searched'}) and checking it against this scenario ({sc.start_year}-{sc.end_year}, {sc.universe})")
     evid, per_family = {}, {}
     for h in search.hyps:
         evid[h["id"]] = lib.evidence(h)
         per_family.setdefault(h.get("family", "?"), evid[h["id"]])
+    emitted = False
     for fam, ev in per_family.items():
         top = [p for p in ev["papers"] if p.get("relevance", 0) > 0][:2]
-        if top:
+        if top or (not emitted and fam == next(iter(per_family))):
+            emitted = True
             ctx.emit("literature", family=fam, scenario={"start_year": sc.start_year, "end_year": sc.end_year, "universe": sc.universe, "survivor_universe": sc.survivor_universe},
                      papers=top, has_direct_support=ev["has_direct_support"], expected_haircut=ev["expected_haircut"], caveats=ev["caveats"],
                      live=lib.online, search_status=list(lib.status))
@@ -246,22 +248,23 @@ EXTRACT_SCHEMA = {"type": "object", "properties": {
     "claimed_sharpe": {"type": ["number", "null"]}, "source": {"type": ["string", "null"]}, "publication_year": {"type": ["integer", "null"]},
     "rationale": {"type": "string"}}, "required": ["name", "feature_formula", "rationale"]}
 
+# Offline claim -> formula mapping (formulas only; NO paper names or years: the source paper is found by live search).
 _CATALOG = [
-    (("12-1", "momentum", "past winners", "winners"), "ts_return(lag(close, 21), 231)", "12-1 month momentum", "Jegadeesh & Titman (1993)", 1993),
-    (("reversal", "past week", "short-term", "short term", "losers"), "-ts_return(close, 5)", "short-term reversal", "Jegadeesh (1990)", 1990),
-    (("low volatility", "low-volatility", "low risk", "low beta", "idiosyncratic"), "-rolling_std(ret, 60)", "low-volatility anomaly", "Ang, Hodrick, Xing & Zhang (2006)", 2006),
-    (("value", "book-to-market", "book to market"), "btm", "value (book-to-market)", "Fama & French (1992)", 1992),
-    (("volume",), "-(volume / rolling_mean(volume, 20))", "volume shock fade", "Gervais, Kaniel & Mingelgrin (2001)", 2001),
+    (("12-1", "momentum", "past winners", "winners"), "ts_return(lag(close, 21), 231)", "12-1 month momentum"),
+    (("reversal", "past week", "short-term", "short term", "losers"), "-ts_return(close, 5)", "short-term reversal"),
+    (("low volatility", "low-volatility", "low risk", "low beta", "idiosyncratic"), "-rolling_std(ret, 60)", "low-volatility anomaly"),
+    (("value", "book-to-market", "book to market"), "btm", "value (book-to-market)"),
+    (("volume",), "-(volume / rolling_mean(volume, 20))", "volume shock fade"),
 ]
 
 
 def _register_extractor(llm: LLM):
     def mock(hint: dict) -> dict:
         txt = hint["text"].lower()
-        for keys, formula, name, src, yr in _CATALOG:
+        for keys, formula, name in _CATALOG:
             if any(k in txt for k in keys):
-                return {"name": name, "feature_formula": formula, "direction": "long_high", "claimed_sharpe": None, "source": src,
-                        "publication_year": yr, "rationale": f"Matched the described effect to the canonical '{name}' construction."}
+                return {"name": name, "feature_formula": formula, "direction": "long_high", "claimed_sharpe": None, "source": None,
+                        "publication_year": None, "rationale": f"Matched the described effect to the canonical '{name}' construction."}
         return {"name": "unrecognised claim", "feature_formula": "ts_return(close, 20)", "direction": "long_high", "claimed_sharpe": None,
                 "source": None, "publication_year": None, "rationale": "Could not map the text to a known construction; defaulted to 20-day momentum."}
     llm.register_mock("extractor", mock)
@@ -288,7 +291,7 @@ def run_replication(ctx: Ctx, params: dict) -> dict:
     panel = EQ.load_panel() if real else simulate_market_panel(ctx.seed, decay_after=900)
     holdout = 504 if real else 252
     lib = LIT.Librarian(LIT.Scenario.from_meta(panel.meta, panel.dates, n_assets=panel.shape[1]), online=bool(ctx.online_literature))
-    ctx.emit("agent", agent="Librarian", text=("Searching Crossref and arXiv LIVE for the source paper" if lib.online else "Offline: curated index only") + " and checking it against this scenario")
+    ctx.emit("agent", agent="Librarian", text=("Searching OpenAlex, Crossref and arXiv LIVE for the source paper" if lib.online else "Offline: curated index only") + " and checking it against this scenario")
     found = lib.find(obj["name"] + " anomaly stock returns", None, top=4)
     found = [p for p in found if p.get("relevance", 0) > 0][:6]
     ctx.emit("literature", family="replication", papers=found, has_direct_support=any(p["relevance"] >= 4 for p in found),

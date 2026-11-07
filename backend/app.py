@@ -121,12 +121,9 @@ def run_events(run_id: str, after: int = 0):
 
 @app.get("/api/library")
 def library_list():
-    """Papers/datasets looked at so far (live searches) plus the built-in curated reference list used by the Prosecutors."""
+    """Papers/datasets looked at so far. All come from live searches; there is no built-in list."""
     from . import library
-    from .literature import CORPUS
-    ref = [{"title": e["title"], "authors": e["authors"], "year": e["year"], "venue": e["venue"], "claim": e["claim"], "later": e.get("later", "")}
-           for e in CORPUS]
-    return {"looked_at": library.entries(), "reference": ref}
+    return {"looked_at": library.entries()}
 
 
 @app.get("/api/demo")

@@ -41,7 +41,7 @@ with sync_playwright() as p:
     pg.screenshot(path=str(OUT / "split.png"), full_page=True)
 
     pg.get_by_role("button", name="Papers it used").click(); pg.wait_for_timeout(800)
-    assert "built-in reference list" in pg.inner_text("body").lower(), "papers tab missing"
+    assert "papers & datasets it has looked at" in pg.inner_text("body").lower(), "papers tab missing"
     pg.screenshot(path=str(OUT / "papers.png"), full_page=True)
 
     pg.get_by_role("button", name="Check a paper").click(); pg.wait_for_timeout(500)

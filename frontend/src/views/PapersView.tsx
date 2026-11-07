@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 
 type Entry = { title: string; authors: string; year: number | string | null; venue: string; url: string | null; source: string; kind: string; snippet: string; uses: number; contexts: string[]; last_seen: number }
-type Ref = { title: string; authors: string; year: number; venue: string; claim: string; later: string }
 
 const ago = (t: number) => { const s = Math.max(1, Math.round(Date.now() / 1000 - t)); return s < 90 ? `${s}s ago` : s < 5400 ? `${Math.round(s / 60)} min ago` : s < 129600 ? `${Math.round(s / 3600)} h ago` : `${Math.round(s / 86400)} d ago` }
 
 export default function PapersView() {
-  const [d, setD] = useState<{ looked_at: Entry[]; reference: Ref[] } | null>(null)
+  const [d, setD] = useState<{ looked_at: Entry[] } | null>(null)
   const [err, setErr] = useState('')
   const [q, setQ] = useState('')
   const [kind, setKind] = useState<'all' | 'paper' | 'dataset'>('all')
@@ -47,15 +46,6 @@ export default function PapersView() {
           </div>
         ))}
       </div>
-      <details className="card p-3">
-        <summary className="cursor-pointer text-sm font-medium">Built-in reference list ({d.reference.length}) · what the Prosecutors always check against</summary>
-        <div className="mt-2 text-[11px] text-amber-300/90">Hand-written summaries, not live search results. Verify before citing.</div>
-        <div className="mt-2 space-y-2">
-          {d.reference.map((r) => (
-            <div key={r.title} className="text-sm"><b>{r.authors}</b> ({r.year}) <span className="text-slate-300">{r.title}</span><div className="text-[11px] text-mute">{r.venue} · {r.claim}{r.later ? ` Later work: ${r.later}` : ''}</div></div>
-          ))}
-        </div>
-      </details>
     </div>
   )
 }

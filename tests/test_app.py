@@ -104,13 +104,26 @@ def test_librarian_live_uses_only_api_results(monkeypatch):
     found = lib.find("short-term reversal weekly stock returns", "mean_reversion")
     live = [p for p in found if p["source"].endswith("(live)")]
     assert live and live[0]["url"] == "https://doi.org/10.1/x" and live[0]["expected_haircut"] > 0       # post-publication decay flagged
-    assert all(p["source"].startswith("curated index") for p in found if p not in live)                    # fallback is labelled
+    assert found == live                                                                                   # no hardcoded papers mixed in
     assert "arXiv: unavailable (URLError)" in lib.status
 
 
-def test_librarian_offline_has_no_live_papers():
+def test_librarian_offline_finds_nothing_and_there_is_no_builtin_list():
     lib = LIT.Librarian(LIT.Scenario(), online=False)
-    assert all(p["source"].startswith("curated index") for p in lib.find("momentum winners", "momentum"))
+    assert lib.find("momentum winners", "momentum") == [] and "offline" in lib.status[0]
+    assert not hasattr(LIT, "CORPUS")
+
+
+def test_openalex_parses_real_shape(monkeypatch):
+    import json as J
+    monkeypatch.setenv("OPENALEX_API_KEY", "k")
+    body = {"results": [{"title": "Momentum &amp; value", "authorships": [{"author": {"display_name": "Ann Lee"}}], "publication_year": 2010,
+                         "doi": "https://doi.org/10.1/q", "id": "https://openalex.org/W1", "cited_by_count": 42,
+                         "primary_location": {"source": {"display_name": "J Fin"}}, "abstract_inverted_index": {"momentum": [0], "works": [1]}}]}
+    monkeypatch.setattr(LIT, "_get", lambda url, t: J.dumps(body).encode())
+    monkeypatch.setattr(LIT, "_cached", lambda kind, q, fn: fn())
+    r = LIT.openalex("momentum")[0]
+    assert r["title"] == "Momentum & value" and r["abstract"] == "momentum works" and r["cited_by"] == 42 and r["url"].startswith("https://doi.org")
 
 
 def test_dotenv_loader(tmp_path, monkeypatch):
@@ -222,5 +235,5 @@ def test_library_records_and_lists(monkeypatch):
     library.record([{"title": "A real paper", "url": "https://doi.org/10.1/a", "source": "Crossref (live)"}], "chat: another question")
     d = client.get("/api/library").json()
     e = [x for x in d["looked_at"] if x["url"] == "https://doi.org/10.1/a"][0]
-    assert e["uses"] == 2 and len(e["contexts"]) == 2 and d["reference"]
+    assert e["uses"] == 2 and len(e["contexts"]) == 2 and "reference" not in d
     assert client.get("/api/benchmark").status_code in (200, 404) and client.post("/api/nullrerun", json={}).status_code in (404, 405)

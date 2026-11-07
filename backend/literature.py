@@ -1,17 +1,13 @@
-"""Librarian: finds research papers for a hypothesis, checks whether they APPLY to the user's current scenario, and
-feeds that evidence to the Prosecutors.
+"""Librarian: finds research papers for a hypothesis ON THE INTERNET, checks whether they APPLY to the user's current scenario,
+and feeds that evidence to the Prosecutors.
 
-Sources
-  * a bundled index of well-known papers (works offline; deterministic). Entries carry only facts I am confident of:
-    authors, year, venue, the claim, sample period/universe. Verify before citing: this is an index, not a literature review.
-  * LIVE search (default on; SKEPTIC_OFFLINE=1 disables): Crossref + arXiv (+ OpenAlex if OPENALEX_API_KEY is set). Every live
-    paper is a real API result with a DOI/arXiv link; nothing is generated. A source that is down contributes nothing and is
-    reported; the curated index is then the only fallback and is labelled 'curated index, verify'.
-LLM role 'librarian' (cheap model) is only used to summarise relevance when a real provider is configured.
+There are NO hardcoded papers. Every paper is a real result from a live search of OpenAlex (needs OPENALEX_API_KEY),
+Crossref and arXiv, with a DOI/arXiv link. A source that is down contributes nothing and the status is reported. With
+SKEPTIC_OFFLINE=1 (or no network) the Librarian simply finds nothing and says so.
 
-Applicability checks (zero tokens) compare a paper with the CURRENT scenario: sample overlap (is our data out-of-sample?),
-years since publication (McLean & Pontiff 2016: anomaly returns are ~26% lower out-of-sample and ~58% lower post-publication),
-universe/size mismatch, asset class and frequency. The result is a literature-implied haircut and a list of caveats.
+Applicability (zero tokens) uses only what the search APIs return (publication year, venue, citations): whether all of the
+user's data post-dates the paper, and that its sample period/universe are NOT known and must be read in the paper itself.
+The decay haircuts are heuristics, not citations.
 """
 from __future__ import annotations
 
@@ -27,53 +23,6 @@ from pathlib import Path
 
 CACHE = Path(__file__).resolve().parents[1] / ".lit_cache"
 
-# year published, sample period of the original evidence (start, end), universe, plus what later work found
-CORPUS = [
-    {"id": "jt93", "authors": "Jegadeesh & Titman", "year": 1993, "title": "Returns to Buying Winners and Selling Losers: Implications for Stock Market Efficiency",
-     "venue": "Journal of Finance", "families": ["momentum"], "keys": ["momentum", "winners", "12-1", "trend"], "sample": (1965, 1989),
-     "universe": "all NYSE/AMEX stocks", "claim": "Stocks that did well over the past 3-12 months keep outperforming over the next 3-12 months.",
-     "later": "Momentum survives out of sample in many markets but suffers sharp crashes (e.g. 2009) and weaker returns in large caps."},
-    {"id": "j90", "authors": "Jegadeesh", "year": 1990, "title": "Evidence of Predictable Behavior of Security Returns", "venue": "Journal of Finance",
-     "families": ["mean_reversion"], "keys": ["reversal", "short-term", "short term", "losers", "mean reversion"], "sample": (1934, 1987),
-     "universe": "NYSE/AMEX stocks", "claim": "Last month's losers outperform last month's winners the next month (short-term reversal).",
-     "later": "Reversal profits are concentrated in small, illiquid stocks and are largely consumed by trading costs."},
-    {"id": "l90", "authors": "Lehmann", "year": 1990, "title": "Fads, Martingales, and Market Efficiency", "venue": "Quarterly Journal of Economics",
-     "families": ["mean_reversion"], "keys": ["reversal", "weekly", "fads"], "sample": (1962, 1986), "universe": "CRSP stocks",
-     "claim": "Weekly returns reverse: last week's losers beat last week's winners.", "later": "Much of the profit disappears after transaction costs and liquidity effects."},
-    {"id": "ahxz06", "authors": "Ang, Hodrick, Xing & Zhang", "year": 2006, "title": "The Cross-Section of Volatility and Expected Returns", "venue": "Journal of Finance",
-     "families": ["volatility"], "keys": ["volatility", "low risk", "low-volatility", "idiosyncratic"], "sample": (1963, 2000), "universe": "US stocks",
-     "claim": "Stocks with high idiosyncratic volatility have abysmally low subsequent returns.", "later": "The low-volatility effect is strong in small stocks and weaker in large caps; related to the lottery/leverage-constraint explanations."},
-    {"id": "ff92", "authors": "Fama & French", "year": 1992, "title": "The Cross-Section of Expected Stock Returns", "venue": "Journal of Finance",
-     "families": ["fundamentals"], "keys": ["value", "book-to-market", "book to market", "size"], "sample": (1963, 1990), "universe": "NYSE/AMEX/Nasdaq stocks",
-     "claim": "Size and book-to-market explain the cross-section of average returns.", "later": "The value premium was weak for much of the 2010s; value is itself a standard risk factor, so a 'value' signal is beta, not new alpha."},
-    {"id": "gkm01", "authors": "Gervais, Kaniel & Mingelgrin", "year": 2001, "title": "The High-Volume Return Premium", "venue": "Journal of Finance",
-     "families": ["volume_sentiment"], "keys": ["volume", "high-volume"], "sample": (1963, 1996), "universe": "NYSE/AMEX stocks",
-     "claim": "Stocks with unusually high trading volume tend to appreciate over the following month.", "later": "Evidence is mixed outside the original sample."},
-    {"id": "fp14", "authors": "Frazzini & Pedersen", "year": 2014, "title": "Betting Against Beta", "venue": "Journal of Financial Economics",
-     "families": ["volatility"], "keys": ["low beta", "low risk", "volatility"], "sample": (1926, 2012), "universe": "US and 20 international equity markets",
-     "claim": "Low-beta assets earn higher risk-adjusted returns than high-beta assets.", "later": "Sensitive to leverage and funding assumptions."},
-    {"id": "mp16", "authors": "McLean & Pontiff", "year": 2016, "title": "Does Academic Research Destroy Stock Return Predictability?", "venue": "Journal of Finance",
-     "families": ["*"], "keys": ["decay", "publication", "replication", "anomaly", "out-of-sample"], "sample": (1926, 2013), "universe": "97 published anomalies",
-     "claim": "Anomaly returns are about 26% lower out of sample and about 58% lower after publication.", "later": "Standard reference for post-publication decay."},
-    {"id": "hlz16", "authors": "Harvey, Liu & Zhu", "year": 2016, "title": "...and the Cross-Section of Expected Returns", "venue": "Review of Financial Studies",
-     "families": ["*"], "keys": ["multiple testing", "data mining", "t-statistic", "factor zoo", "luck"], "sample": (1967, 2014), "universe": "316 published factors",
-     "claim": "After accounting for the many factors tried, a new factor needs a t-statistic above about 3.0.", "later": "The motivating result for auditing the whole search, not only the winner."},
-    {"id": "hxz20", "authors": "Hou, Xue & Zhang", "year": 2020, "title": "Replicating Anomalies", "venue": "Review of Financial Studies",
-     "families": ["*"], "keys": ["replication", "anomaly", "microcap", "failed"], "sample": (1967, 2014), "universe": "452 anomalies",
-     "claim": "Most published anomalies fail to replicate once microcaps are controlled and stricter significance thresholds are used.", "later": ""},
-    {"id": "bl14", "authors": "Bailey & Lopez de Prado", "year": 2014, "title": "The Deflated Sharpe Ratio", "venue": "Journal of Portfolio Management",
-     "families": ["*"], "keys": ["sharpe", "backtest", "overfitting", "selection bias"], "sample": (0, 0), "universe": "method",
-     "claim": "A Sharpe ratio must be deflated for the number of strategies tried and for non-normal returns.", "later": ""},
-    {"id": "w00", "authors": "White", "year": 2000, "title": "A Reality Check for Data Snooping", "venue": "Econometrica", "families": ["*"],
-     "keys": ["data snooping", "reality check", "bootstrap"], "sample": (0, 0), "universe": "method",
-     "claim": "Bootstrap the best performance among all models tried to test whether the best one beats a benchmark.", "later": ""},
-    {"id": "bickel75", "authors": "Bickel, Hammel & O'Connell", "year": 1975, "title": "Sex Bias in Graduate Admissions: Data from Berkeley", "venue": "Science",
-     "families": ["subgroup"], "keys": ["simpson", "confound", "pooled", "stratif"], "sample": (0, 0), "universe": "admissions data",
-     "claim": "A pooled association can reverse sign within every subgroup (Simpson's paradox).", "later": ""},
-    {"id": "jo17", "authors": "Johari, Koomen, Pekelis & Walsh", "year": 2017, "title": "Peeking at A/B Tests: Why It Matters, and What to Do About It", "venue": "KDD",
-     "families": ["subgroup"], "keys": ["peeking", "a/b", "experiment", "sequential", "optional stopping"], "sample": (0, 0), "universe": "online experiments",
-     "claim": "Repeatedly checking significance and stopping early inflates false positives far above the nominal rate.", "later": ""},
-]
 
 
 @dataclass
@@ -93,41 +42,6 @@ class Scenario:
         sy, ey = (int(dates[0].year), int(dates[-1].year)) if dates is not None and len(dates) else (2018, 2025)
         return cls(start_year=sy, end_year=ey, n_assets=n_assets, universe=meta.get("source", "unknown"),
                    survivor_universe=bool(meta.get("survivorship_bias")))
-
-
-def _score(text: str, entry: dict, family: str | None) -> float:
-    t = text.lower()
-    s = sum(2.0 for k in entry["keys"] if k in t)
-    if family and (family in entry["families"]):
-        s += 3.0
-    if "*" in entry["families"]:
-        s += 0.5 if s else 0.0
-    return s
-
-
-def assess(entry: dict, sc: Scenario) -> dict:
-    """Does this paper's evidence apply to the current scenario? (deterministic, zero tokens)"""
-    cav, haircut = [], 0.0
-    s0, s1 = entry["sample"]
-    if s1:
-        if sc.start_year > s1:
-            cav.append(f"Your data ({sc.start_year}-{sc.end_year}) is entirely after the paper's sample ({s0}-{s1}): a genuine out-of-sample test.")
-            haircut = max(haircut, 0.26)
-        if sc.start_year > entry["year"]:
-            cav.append(f"All of your data is post-publication ({entry['year']}): expect a decay of roughly 58% in anomaly returns (McLean & Pontiff 2016).")
-            haircut = max(haircut, 0.58)
-        elif sc.end_year > entry["year"] > sc.start_year:
-            cav.append(f"The paper appeared in {entry['year']}, inside your sample: compare before vs after.")
-            haircut = max(haircut, 0.30)
-    if "NYSE" in entry["universe"] or "CRSP" in entry["universe"] or "all" in entry["universe"]:
-        if sc.n_assets < 500:
-            cav.append(f"Original universe is broad ({entry['universe']}); yours has {sc.n_assets} names, so small-stock effects are mostly absent.")
-    if sc.survivor_universe and entry["year"]:
-        cav.append("Your universe is survivors only, which flatters anything that buys past losers or holds long.")
-    if entry.get("later"):
-        cav.append("Later work: " + entry["later"])
-    applicability = 1.0 - min(0.8, 0.15 * len([c for c in cav if "Original universe" in c or "survivors" in c]) + haircut * 0.5)
-    return {"applicability": round(applicability, 2), "expected_haircut": haircut, "caveats": cav}
 
 
 _STOP = set("the a an of and or to in on for with by from that this these those is are was were be been it its as at stocks stock "
@@ -211,24 +125,37 @@ def arxiv(query: str, rows: int = 5, timeout: float = 8.0) -> list[dict]:
     return _cached("arxiv", f"{query}|{rows}", fetch)
 
 
-def openalex(query: str, rows: int = 5, timeout: float = 8.0) -> list[dict]:
-    """Live OpenAlex search. Needs OPENALEX_API_KEY (free) for more than the tiny shared daily budget; skipped otherwise."""
+def _abstract(inv: dict | None) -> str:
+    """OpenAlex stores abstracts as an inverted index {word: [positions]}; rebuild the text."""
+    if not inv:
+        return ""
+    pos = {}
+    for w, idxs in inv.items():
+        for i in idxs:
+            pos[i] = w
+    return " ".join(pos[i] for i in sorted(pos))
+
+
+def openalex(query: str, rows: int = 5, timeout: float = 10.0) -> list[dict]:
+    """Live OpenAlex search (title, authors, year, DOI, venue, abstract, citation count). Needs OPENALEX_API_KEY."""
     key = os.environ.get("OPENALEX_API_KEY")
     if not key:
-        raise RuntimeError("OPENALEX_API_KEY not set (optional)")
+        raise RuntimeError("OPENALEX_API_KEY not set")
 
     def fetch():
         url = "https://api.openalex.org/works?" + urllib.parse.urlencode(
-            {"search": query, "per-page": rows, "api_key": key, "select": "title,authorships,publication_year,doi,primary_location"})
+            {"search": query, "per-page": rows, "api_key": key,
+             "select": "title,authorships,publication_year,doi,primary_location,abstract_inverted_index,cited_by_count,id"})
         out = []
         for it in json.loads(_get(url, timeout).decode())["results"]:
             names = [a["author"]["display_name"] for a in it.get("authorships", [])]
             au = ", ".join(n.split()[-1] for n in names[:3]) + (" et al." if len(names) > 3 else "")
-            out.append({"title": it.get("title") or "", "authors": au, "year": it.get("publication_year"), "doi": it.get("doi"),
-                        "url": it.get("doi"), "venue": ((it.get("primary_location") or {}).get("source") or {}).get("display_name") or "",
-                        "abstract": "", "source": "OpenAlex (live)"})
+            out.append({"title": html.unescape(it.get("title") or ""), "authors": au, "year": it.get("publication_year"), "doi": it.get("doi"),
+                        "url": it.get("doi") or it.get("id"), "venue": ((it.get("primary_location") or {}).get("source") or {}).get("display_name") or "",
+                        "abstract": _abstract(it.get("abstract_inverted_index"))[:600], "cited_by": it.get("cited_by_count"),
+                        "source": "OpenAlex (live)"})
         return out
-    return _cached("openalex", f"{query}|{rows}", fetch)
+    return _cached("openalex2", f"{query}|{rows}", fetch)
 
 
 def live_search(query: str, rows: int = 5) -> tuple[list[dict], list[str]]:
@@ -245,7 +172,8 @@ def live_search(query: str, rows: int = 5) -> tuple[list[dict], list[str]]:
             papers += res
             notes.append(f"{n}: {len(res)} results")
         except Exception as e:  # noqa: BLE001  (one source failing must not stop the others)
-            notes.append(f"{n}: unavailable ({type(e).__name__})")
+            code = getattr(e, "code", None)
+            notes.append(f"{n}: unavailable ({'HTTP ' + str(code) if code else str(e)[:60] or type(e).__name__})")
     seen, uniq = set(), []
     for p in papers:
         k = re.sub(r"\W+", "", p["title"].lower())[:60]
@@ -269,9 +197,9 @@ def assess_live(p: dict, sc: Scenario) -> dict:
     yr = p.get("year")
     if yr:
         if sc.start_year > yr:
-            cav.append(f"All of your data ({sc.start_year}-{sc.end_year}) is after this paper appeared ({yr}): expect post-publication decay "
-                       "(McLean & Pontiff 2016: about 58% lower anomaly returns).")
-            haircut = 0.58
+            cav.append(f"All of your data ({sc.start_year}-{sc.end_year}) is after this paper appeared ({yr}): published effects often weaken "
+                       "after publication (assumed ~50% here: a heuristic, not a citation).")
+            haircut = 0.5
         elif sc.start_year < yr < sc.end_year:
             cav.append(f"Published in {yr}, inside your sample: compare before vs after.")
             haircut = 0.30
@@ -295,20 +223,15 @@ class Librarian:
             if not any(f in query.lower() for f in _FIN):
                 query += " stock returns"                      # anchor to finance so common words ("rebound", "fell") don't match medicine
             terms = _terms(query)
-            live, notes = live_search(query, 6)
+            live, notes = live_search(query, 8)
             self.status = notes
             on_topic = [p for p in live if any(f in (p["title"] + " " + (p.get("abstract") or "")).lower() for f in _FIN)]
-            ranked = sorted(((_live_relevance(p, terms), p) for p in on_topic), key=lambda x: -x[0])
+            ranked = sorted(((_live_relevance(p, terms), p) for p in on_topic), key=lambda x: (-x[0], -(x[1].get("cited_by") or 0)))   # ties: more-cited first
             for rel, p in [x for x in ranked if x[0] >= 2][:top]:
                 found.append({**p, "id": p.get("doi") or p["url"], "claim": (p.get("abstract") or "")[:240] or "(no abstract returned: open the link)",
                               "sample": None, "universe": None, "relevance": round(rel, 1), **assess_live(p, self.scenario)})
-        ranked = sorted(((_score(text, e, family), e) for e in CORPUS), key=lambda x: -x[0])
-        for sc_, e in ranked[:top]:
-            if sc_ <= 0:
-                continue
-            found.append({**{k: e[k] for k in ("id", "authors", "year", "title", "venue", "claim", "sample", "universe")},
-                          "relevance": round(sc_, 1), "source": "curated index (not live: verify before citing)", "url": None,
-                          **assess(e, self.scenario)})
+        if not self.online:
+            self.status = ["offline (SKEPTIC_OFFLINE=1): no papers searched"]
         self.cache[key] = found
         try:
             from . import library
@@ -321,7 +244,7 @@ class Librarian:
         """Literature evidence for one hypothesis: supporting papers, applicability, implied haircut, and a prior suggestion."""
         text = f"{hyp.get('description', '')} {hyp.get('spec', {}).get('formula', '') or ''} {hyp.get('spec', {}).get('rule', '') or ''}"
         papers = self.find(text, hyp.get("family"))
-        direct = [p for p in papers if p["relevance"] >= 4.0 and p["id"] not in ("mp16", "hlz16", "hxz20", "bl14", "w00")]
+        direct = [p for p in papers if p["relevance"] >= 4.0]
         return {"papers": papers, "has_direct_support": bool(direct),
                 "expected_haircut": max([p["expected_haircut"] for p in direct], default=0.0),
                 "prior_suggestion": 0.8 if direct else 0.3,

@@ -94,14 +94,18 @@ def test_no_eval_or_exec_in_codebase():
         assert not re.search(r"(?<![\w.])(eval|exec)\(", src.replace("evaluate(", "")), f
 
 
-def test_librarian_finds_applicable_papers_and_feeds_prosecutor():
+def test_librarian_finds_applicable_papers_and_feeds_prosecutor(monkeypatch):
     from skeptic.backend import literature as LIT
+    paper = {"title": "Short-term reversal in stock returns", "authors": "A. Author", "year": 2005, "venue": "J Fin",
+             "abstract": "Ten day return reversal mean reversion in stock returns.", "url": "https://doi.org/10.1/r", "source": "OpenAlex (live)", "cited_by": 10}
+    monkeypatch.setattr(LIT, "live_search", lambda q, n=6: ([paper], ["OpenAlex: 1 results"]))
     sc = LIT.Scenario(start_year=2010, end_year=2025, n_assets=117, survivor_universe=True)
-    lib = LIT.Librarian(sc, online=False)
+    lib = LIT.Librarian(sc, online=True)
     ev = lib.evidence({"description": "10-day reversal", "family": "mean_reversion", "spec": {"formula": "-ts_return(close, 10)"}})
-    assert ev["has_direct_support"] and ev["expected_haircut"] >= 0.5
-    assert any("post-publication" in c for c in ev["caveats"])
-    assert not any(p["id"] == "bickel75" for p in ev["papers"])          # unrelated paper must not match
+    assert ev["has_direct_support"] and ev["expected_haircut"] >= 0.3
+    assert any("after this paper appeared" in c for c in ev["caveats"])
+    monkeypatch.setattr(LIT, "live_search", lambda q, n=6: ([], ["offline"]))
+    lib = LIT.Librarian(sc, online=True)
     none = lib.evidence({"description": "weekday tilt", "family": "calendar", "spec": {"formula": "dow() * rolling_mean(ret, 5)"}})
     assert not none["has_direct_support"]
     # attack: an implausibly good, unsupported idea is flagged (advisory, medium severity)

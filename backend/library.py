@@ -1,7 +1,7 @@
 """Research library: every paper/dataset the Librarian or the chat agent has actually looked at, and what it was used for.
 
 Persisted as JSON (git-ignored) so the UI can show 'papers it has looked at / is referencing'. Entries are only ever
-added from real search results or the labelled curated index; nothing is generated.
+added from real live search results; nothing is generated or hardcoded.
 """
 from __future__ import annotations
 
