@@ -10,6 +10,7 @@ import numpy as np
 
 from ..adapters.synthetic import SynthConfig, generate
 from ..court import stats as S
+from ..court import null_worlds as NW
 
 METHODS = {
     "Naive (p<0.05)": lambda d, p: S.naive(p),
@@ -18,6 +19,18 @@ METHODS = {
     "Benjamini-Hochberg": lambda d, p: S.benjamini_hochberg(p),
     "Deflated Sharpe": lambda d, p: S.deflated_sharpe(d.pnl),
 }
+
+
+def null_world_methods(n_worlds: int = 300, method: str = "stationary_bootstrap") -> dict:
+    """Phase-2 'Skeptic' rows: whole-search max-statistic test (Romano-Wolf step-down), alpha = 0.05.
+    Prosecutors (Phase 5) are layered on top for the full court; these rows are the null-world engine alone."""
+    def make(stat):
+        def fn(d, p):
+            r = NW.run_null_worlds(d.pnl, d.factors, stat, method, n_worlds=n_worlds, seed=int(d.cfg.seed) + 1000)
+            return (r.p_stepdown < 0.05) & (r.observed > 0)          # positive-direction discoveries only
+        return fn
+    return {"Null-world search audit (raw t)": make(S.raw_t),
+            "Null-world audit (factor-adj alpha)": make(S.alpha_t)}
 
 
 def score(claims: np.ndarray, data) -> dict:
@@ -77,4 +90,4 @@ if __name__ == "__main__":
     ap.add_argument("--seeds", type=int, default=5)
     a = ap.parse_args()
     print(f"Synthetic benchmark: 500 signals, 5 planted, 10 confounded decoys, 5 traps; {a.seeds} seeds")
-    print_table(run(a.seeds))
+    print_table(run(a.seeds, extra_methods=null_world_methods()))

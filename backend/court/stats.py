@@ -29,6 +29,33 @@ def pvalues_two_sided(pnl: np.ndarray) -> np.ndarray:
     return 2 * stats.t.sf(np.abs(t), df=T - 1)
 
 
+# ---------------- search statistics (signed; Court uses |stat|) ----------------
+
+def raw_t(pnl: np.ndarray, factors: np.ndarray | None = None) -> np.ndarray:
+    """t-statistic of mean pnl, ignores factors."""
+    return tstat(pnl)
+
+
+def alpha_t(pnl: np.ndarray, factors: np.ndarray) -> np.ndarray:
+    """t-stat of the intercept in pnl_k = a + B f + e (alpha vs known factors), all signals at once."""
+    K, T = pnl.shape
+    X = np.column_stack([np.ones(T), factors])
+    p = X.shape[1]
+    XtXi = np.linalg.inv(X.T @ X)
+    beta = XtXi @ (X.T @ pnl.T)                       # (p,K)
+    resid = pnl.T - X @ beta
+    s2 = (resid ** 2).sum(axis=0) / (T - p)
+    return beta[0] / np.sqrt(np.maximum(s2 * XtXi[0, 0], 1e-300))
+
+
+def factor_betas(pnl: np.ndarray, factors: np.ndarray) -> np.ndarray:
+    """(K, n_factors) OLS betas of each signal's pnl on the factors (with intercept)."""
+    K, T = pnl.shape
+    X = np.column_stack([np.ones(T), factors])
+    beta = np.linalg.lstsq(X, pnl.T, rcond=None)[0]
+    return beta[1:].T
+
+
 # ---------------- baselines: each returns a boolean "claimed discovery" mask ----------------
 
 def naive(p: np.ndarray, alpha: float = 0.05) -> np.ndarray:
