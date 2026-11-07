@@ -66,7 +66,15 @@ def backtest(panel: Panel, formula: str, universe: str = "point_in_time", q: flo
 def backtest_feature(panel: Panel, F: np.ndarray, universe: str = "point_in_time", q: float = 0.2, hold: int = 1,
                      ret: np.ndarray | None = None, extra_lag: int = 0) -> dict:
     R = panel.fields["ret"] if ret is None else ret
-    mask = panel.alive if universe == "point_in_time" else (panel.alive & panel.listed_today[None, :])
+    if universe == "point_in_time":
+        mask = panel.alive
+    elif universe == "trim_winners":          # stress: drop the 20% of names with the best full-sample return (hindsight winners)
+        c = panel.fields["close"]
+        tot = np.array([(c[np.isfinite(c[:, j]), j][-1] / c[np.isfinite(c[:, j]), j][0]) if np.isfinite(c[:, j]).sum() > 2 else np.nan for j in range(c.shape[1])])
+        keep = tot < np.nanquantile(tot, 0.8)
+        mask = panel.alive & keep[None, :]
+    else:
+        mask = panel.alive & panel.listed_today[None, :]
     w = _ls_weights(F, mask, q)
     if hold > 1:
         idx = (np.arange(w.shape[0]) // hold) * hold
@@ -83,20 +91,23 @@ def backtest_feature(panel: Panel, F: np.ndarray, universe: str = "point_in_time
 
 
 def known_factors(panel: Panel) -> np.ndarray:
-    """MKT (equal-weight), SIZE (small-minus-big proxy), VAL (btm), MOM (12-1): built from the panel, causal."""
+    """MKT (equal-weight), SIZE (small-minus-big proxy), VAL (btm, if fundamentals exist), MOM (12-1): built from the
+    panel itself, causal. Sets panel.factor_names to the factors actually available."""
     R = panel.fields["ret"]
-    mkt = np.nanmean(np.where(panel.alive, R, np.nan), axis=1)
-    mkt = np.nan_to_num(mkt)
-    out = [mkt]
-    for f in ("-log(rolling_mean(close * volume, 60))", "btm", "ts_return(lag(close, 21), 231)"):
-        # tiny helper for product: expressed via DSL multiplication of fields
-        res = backtest(panel, f, universe="point_in_time")["pnl"]
-        out.append(res)
-    return np.column_stack(out)
+    mkt = np.nan_to_num(np.nanmean(np.where(panel.alive, R, np.nan), axis=1))
+    cols, names = [mkt], ["MKT"]
+    spec = [("SIZE", "-log(rolling_mean(close * volume, 60))"), ("VAL", "btm"), ("MOM", "ts_return(lag(close, 21), 231)")]
+    for nm, f in spec:
+        if nm == "VAL" and not np.isfinite(panel.fields.get("btm", np.full(1, np.nan))).any():
+            continue
+        cols.append(backtest(panel, f, universe="point_in_time")["pnl"]); names.append(nm)
+    panel.factor_names = names
+    return np.column_stack(cols)
 
 
 # --------------------------------------------------------------------------------------------- simulator
-def simulate_market_panel(seed: int = 0, n_days: int = 1500, n_assets: int = 150, planted: bool = True) -> Panel:
+def simulate_market_panel(seed: int = 0, n_days: int = 1500, n_assets: int = 150, planted: bool = True,
+                          decay_after: int | None = None, decay_to: float = 0.25) -> Panel:
     rng = np.random.default_rng(seed)
     T, N = n_days, n_assets
     dates = pd.bdate_range("2018-01-01", periods=T)
@@ -140,7 +151,7 @@ def simulate_market_panel(seed: int = 0, n_days: int = 1500, n_assets: int = 150
         drift = np.zeros(N)
         if planted:
             if t > 11:
-                d = zs(close[t - 1] / close[t - 11] - 1); drivers["reversal10"][t - 1] = -d; drift += strength["reversal10"] * -d
+                d = zs(close[t - 1] / close[t - 11] - 1); drivers["reversal10"][t - 1] = -d; drift += strength["reversal10"] * (decay_to if (decay_after is not None and t >= decay_after) else 1.0) * -d
             if t > 62:
                 rs = ret[t - 60:t].std(axis=0); d = zs(rs); drivers["lowvol60"][t - 1] = -d; drift += strength["lowvol60"] * -d
             if t > 22:

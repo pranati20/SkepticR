@@ -68,6 +68,16 @@ def leakage(search, k, cfg: AttackConfig):
 def survivorship(search, k, cfg: AttackConfig):
     spec = search.hyps[k]["spec"]
     uni = spec.get("universe", "point_in_time")
+    if uni == "point_in_time" and search.meta.get("survivorship_bias") and search.rerun is not None:
+        # the DATA itself only contains today's survivors; we cannot re-run on the true universe, so stress it:
+        # remove the 20% of names with the best hindsight return and see how much of the edge was riding on them
+        base = _sr(search.pnl[k])
+        trimmed = _sr(search.rerun(k, universe="trim_winners"))
+        keep = trimmed / base if base > 0 else 0.0
+        return result("survivorship", "medium", keep >= 0.5, universe="today's constituents (survivors only)",
+                      reported_sharpe=base, sharpe_without_hindsight_winners=trimmed, edge_retained=float(keep),
+                      note="Dataset contains only companies that are still listed. Treat the edge as overstated; this is a stress test, "
+                           "not a correction, because delisted names are unavailable.")
     if uni == "point_in_time":
         return result("survivorship", "high", True, universe=uni, note="uses point-in-time constituents")
     ev = {"universe": uni, "reported_sharpe": _sr(search.pnl[k])}

@@ -50,6 +50,7 @@ class Hunter:
     family: str
     llm: LLM
     seed: int = 0
+    fields: set | None = None            # data fields that actually exist; formulas using others are rejected
 
     @property
     def name(self) -> str:
@@ -67,6 +68,9 @@ class Hunter:
             try:
                 pf = parse(h["feature_formula"])
             except DSLError:
+                bad += 1
+                continue
+            if self.fields is not None and not pf.fields <= self.fields:
                 bad += 1
                 continue
             uni = h.get("universe", "point_in_time")

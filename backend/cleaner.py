@@ -75,14 +75,16 @@ def clean(panel: Panel, llm: LLM, ledger: Ledger, run_id: str, search_end: int |
 
     # 3. point-in-time fundamentals
     L = int(choice["fundamental_lag_days"])
-    if "btm" in out.fields and L > 0:
+    has_btm = "btm" in out.fields and np.isfinite(out.fields["btm"]).any()
+    if has_btm and L > 0:
         b = out.fields["btm"]
         out.fields["btm"] = np.vstack([np.full((L, b.shape[1]), np.nan), b[:-L]])
-    rep["steps"].append({"step": "fundamental_lag", "days": L, "rows_affected": int(out.fields["btm"].shape[0] * out.fields["btm"].shape[1]) if L else 0})
-    ledger.record_cleaning(run_id, "cleaner", "fundamental_lag_days", L, len(OPTIONS["fundamental_lag_days"]), 0, seed)
-    if L == 0:
+    if has_btm:
+        rep["steps"].append({"step": "fundamental_lag", "days": L, "rows_affected": int(out.fields["btm"].size) if L else 0})
+        ledger.record_cleaning(run_id, "cleaner", "fundamental_lag_days", L, len(OPTIONS["fundamental_lag_days"]), 0, seed)
+    if has_btm and L == 0:
         rep["warning"] = "Fundamentals used without a reporting lag: value-type signals may contain lookahead."
 
-    out.factors = known_factors(out)
+    out.factors = known_factors(out)          # also sets out.factor_names to the factors that exist for this data
     out.meta = {**panel.meta, "cleaning": rep["choices"]}
     return out, rep
