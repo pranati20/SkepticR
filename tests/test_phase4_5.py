@@ -45,7 +45,7 @@ def test_mock_hunters_valid_deterministic_and_deduped():
 def market():
     llm = LLM(); H.register_mock(llm); cleaner.register_mock(llm); review.register_mock(llm)
     L = Ledger(); run = L.start_run("t")
-    P = simulate_market_panel(0, n_days=1200, n_assets=100)
+    P = simulate_market_panel(0)
     Pc, rep = cleaner.clean(P, llm, L, run, search_end=P.shape[0] - 252)
     return llm, L, run, P, Pc, rep
 

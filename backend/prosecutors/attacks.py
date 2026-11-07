@@ -22,6 +22,7 @@ class AttackConfig:
     cost_bps: float = 5.0            # one-way cost + slippage in basis points of traded notional
     min_net_sr_frac: float = 0.4     # net Sharpe must keep at least this share of gross
     alpha_t_min: float = 2.0         # factor-adjusted alpha t-stat floor (confounder attack)
+    alpha_p_max: float = 0.05        # ...and its search-adjusted p-value (null worlds on the alpha statistic)
     top_day_frac: float = 0.01       # remove the best 1% of days
     conc_keep: float = 0.35          # mean pnl must keep at least this share without them
     ic_next_max: float = 0.08        # implausible daily IC of a feature with next-day return => leakage
@@ -143,7 +144,11 @@ def confounder(search, k, cfg: AttackConfig):
     X = np.column_stack([np.ones(F.shape[0]), F])
     coef = np.linalg.lstsq(X, pnl[0], rcond=None)[0]
     r2 = 1 - ((pnl[0] - X @ coef) ** 2).sum() / ((pnl[0] - pnl[0].mean()) ** 2).sum()
-    return result("confounder", "high", t_alpha >= cfg.alpha_t_min, raw_t=t_raw, alpha_t=t_alpha, r2_factors=float(r2),
+    p_adj = None
+    if getattr(search, "alpha_adj_p", None) is not None and np.isfinite(search.alpha_adj_p[k]):
+        p_adj = float(search.alpha_adj_p[k])            # alpha t re-audited across the WHOLE search (null worlds)
+    ok = t_alpha >= cfg.alpha_t_min and (p_adj is None or p_adj <= cfg.alpha_p_max)
+    return result("confounder", "high", ok, raw_t=t_raw, alpha_t=t_alpha, alpha_p_adj_search=p_adj, r2_factors=float(r2),
                   betas={n: float(b) for n, b in zip(search.factor_names, betas)},
                   note="alpha vs MKT/SIZE/VAL/MOM; if alpha vanishes it was beta")
 

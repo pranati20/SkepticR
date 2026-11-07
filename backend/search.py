@@ -30,6 +30,7 @@ class Search:
     rerun: Callable | None = None    # rerun(k, universe=None, formula=None, extra_lag=0) -> pnl (T,)
     feature_fn: Callable | None = None   # feature_fn(k) -> (T,N) causal feature, for IC diagnostics
     realized_ret: np.ndarray | None = None
+    alpha_adj_p: np.ndarray | None = None   # search-adjusted p of the factor-adjusted ALPHA t (filled by the Court)
     domain: str = "market"
     meta: dict = field(default_factory=dict)
 

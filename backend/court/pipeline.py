@@ -93,6 +93,12 @@ class Court:
             self._e("agent", agent="Court", text=f"{len(cands)} candidate(s) beat the null at level {level:.3f}; sending to the Prosecutors", round=r)
             attacks: dict[int, list] = {}
             if cands and cfg.run_prosecutors:
+                # confounder attack evidence: audit the factor-ADJUSTED alpha across the same whole search
+                if search.alpha_adj_p is None:
+                    search.alpha_adj_p = np.full(K, np.nan)
+                nullA = NW.run_null_worlds(search.pnl[cum], search.factors, S.alpha_t, cfg.method, cfg.n_worlds, seed=cfg.seed + 303 * (r + 1))
+                self.meter.stat("null_world_search_runs", cfg.n_worlds * len(cum))
+                search.alpha_adj_p[cum] = nullA.p_stepdown
                 with ThreadPoolExecutor(max_workers=4) as ex:
                     futs = {k: ex.submit(prosecute, search, k, cfg.attack, None, self.llm_review) for k in cands}
                     for k, f in futs.items():

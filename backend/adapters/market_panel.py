@@ -120,12 +120,12 @@ def simulate_market_panel(seed: int = 0, n_days: int = 1500, n_assets: int = 150
         btm_lat[t] = x
     # delistings: 15% of names crash then vanish
     delist_day = np.full(N, 10 ** 9)
-    dl = rng.random(N) < 0.15
+    dl = rng.random(N) < 0.22
     delist_day[dl] = rng.integers(int(T * 0.4), int(T * 0.95), dl.sum())
 
     # planted effect strengths expressed as target annualised Sharpe -> IC, a = SR / sqrt(N*252)
     ic = lambda sr: sr / np.sqrt(N * 252)
-    strength = {"reversal10": ic(2.6), "lowvol60": ic(4.5), "volshock": ic(1.8), "value": ic(1.6), "momentum": ic(1.6)} \
+    strength = {"reversal10": ic(4.2), "lowvol60": ic(4.5), "volshock": ic(1.8), "value": ic(1.6), "momentum": ic(1.6)} \
         if planted else {}
     zs = lambda v: (v - np.nanmean(v)) / (np.nanstd(v) + 1e-12)
 
@@ -150,8 +150,8 @@ def simulate_market_panel(seed: int = 0, n_days: int = 1500, n_assets: int = 150
                 d = zs(close[t - 22] / close[t - 252] - 1); drivers["momentum"][t - 1] = d; drift += strength["momentum"] * d
         r = beta * mkt[t] + sec[t, sector] + eps[t] + drift * sig * h[t]
         # distress crash + delisting
-        crash = (t >= delist_day - 15) & (t < delist_day)
-        r = np.where(crash, -0.012 + 0.5 * r, r)
+        crash = (t >= delist_day - 25) & (t < delist_day)
+        r = np.where(crash, -0.016 + 0.5 * r, r)
         gone = t >= delist_day
         r = np.where(gone, np.nan, r)
         alive[t] = ~gone
