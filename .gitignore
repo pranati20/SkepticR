@@ -6,3 +6,5 @@ node_modules/
 .llm_cache/
 results/
 .env
+.lit_cache/
+.library/

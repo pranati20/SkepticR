@@ -3,7 +3,7 @@ import { initialState, reduce } from './state'
 import { useRun } from './useRun'
 import CourtView from './views/CourtView'
 import SplitView from './views/SplitView'
-import BenchmarkView from './views/BenchmarkView'
+import PapersView from './views/PapersView'
 import ReplicationView from './views/ReplicationView'
 import UploadView from './views/UploadView'
 import ChatView from './views/ChatView'
@@ -18,7 +18,7 @@ const SCENARIOS = [
 ]
 const TABS = [
   ['ask', 'Ask the assistant'], ['court', 'Watch it work'], ['upload', 'Check my data'], ['replicate', 'Check a paper'],
-  ['split', 'AI vs Skeptic'], ['bench', 'Proof it works'],
+  ['split', 'AI vs Skeptic'], ['papers', 'Papers it used'],
 ] as const
 
 export default function App() {
@@ -69,7 +69,7 @@ export default function App() {
       <div hidden={tab !== 'ask'}><ChatView /></div>
       {tab === 'court' && <CourtView s={s} />}
       {tab === 'split' && <SplitView s={s} />}
-      {tab === 'bench' && <BenchmarkView />}
+      {tab === 'papers' && <PapersView />}
       {tab === 'replicate' && <ReplicationView s={s} running={run.running} run={(p) => run.live('replication', p)} demo={() => run.demo('replication')} />}
       {tab === 'upload' && <UploadView running={run.running} run={(p) => run.live('upload', p)} goCourt={() => setTab('court')} />}
 

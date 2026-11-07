@@ -2,6 +2,8 @@
 import os
 import time
 
+import tempfile
+os.environ["SKEPTIC_LIBRARY_PATH"] = os.path.join(tempfile.mkdtemp(), "papers.json")   # tests never touch the real library
 os.environ["SKEPTIC_OFFLINE"] = "1"          # tests never touch the network unless they mock it
 
 import numpy as np
@@ -61,14 +63,6 @@ def test_upload_bad_input_is_4xx(body):
 def test_upload_ok():
     r = client.post("/api/upload", json={"csv": "a,b\n1,2\n3,4\n"})
     assert r.status_code == 200 and r.json()["rows"] == 2
-
-
-def test_nullrerun_keyed_on_seed_and_clamped():
-    a = client.post("/api/nullrerun", json={"n_worlds": 50, "seed": 0}).json()
-    b = client.post("/api/nullrerun", json={"n_worlds": 10**6, "seed": 1}).json()
-    assert b["n_worlds"] == A.MAX_WORLDS
-    assert a["planted"][0]["stat"] != b["planted"][0]["stat"]            # different seed -> different data
-    assert client.post("/api/nullrerun", json={"seed": "x"}).status_code == 400
 
 
 def test_cors_not_wildcard():
@@ -220,3 +214,13 @@ def test_illusion_events_compare_backtest_with_reality():
     for e in il:
         assert e["in_total"] > 0 and len(e["in_curve"]) == len(e["real_curve"]) and e["basis"] and e["cause"]
         assert abs(e["in_curve"][-1] - e["in_total"]) < 1e-6
+
+
+def test_library_records_and_lists(monkeypatch):
+    from skeptic.backend import library
+    library.record([{"title": "A real paper", "authors": "Doe", "year": 2020, "url": "https://doi.org/10.1/a", "source": "Crossref (live)"}], "momentum: test")
+    library.record([{"title": "A real paper", "url": "https://doi.org/10.1/a", "source": "Crossref (live)"}], "chat: another question")
+    d = client.get("/api/library").json()
+    e = [x for x in d["looked_at"] if x["url"] == "https://doi.org/10.1/a"][0]
+    assert e["uses"] == 2 and len(e["contexts"]) == 2 and d["reference"]
+    assert client.get("/api/benchmark").status_code in (200, 404) and client.post("/api/nullrerun", json={}).status_code in (404, 405)

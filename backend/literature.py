@@ -16,6 +16,7 @@ universe/size mismatch, asset class and frequency. The result is a literature-im
 from __future__ import annotations
 
 import hashlib
+import html
 import json
 import os
 import re
@@ -130,7 +131,9 @@ def assess(entry: dict, sc: Scenario) -> dict:
 
 
 _STOP = set("the a an of and or to in on for with by from that this these those is are was were be been it its as at stocks stock "
-            "tend returns return next past over their than more less which when what who how not no can will would should".split())
+            "tend returns return next past over their than more less which when what who how not no can will would should "
+            "does do did still work works working find found papers paper dataset datasets data evidence use used using about there any some "
+            "i me my we you your show give tell please want need could may might much many very also just like".split())
 FAMILY_QUERY = {"momentum": "momentum stock returns winners losers", "mean_reversion": "short-term reversal stock returns",
                 "volatility": "low volatility anomaly stock returns", "fundamentals": "value book-to-market stock returns",
                 "volume_sentiment": "trading volume stock returns predictability", "subgroup": "peeking A/B testing false positives"}
@@ -139,10 +142,13 @@ _FIN = ("stock", "equit", "return", "asset pric", "portfolio", "trading", "inves
 UA = "skeptic-research-demo/1.0 (academic literature check)"
 
 
-def _terms(q: str) -> list[str]:
+_DOMAIN = {"stock", "stocks", "returns", "return"}      # stop-words for finance-anchored claim queries, but real content in a free question
+
+
+def _terms(q: str, keep_domain: bool = False) -> list[str]:
     out = []
     for w in re.findall(r"[a-z][a-z\-]{2,}", q.lower()):
-        if w not in _STOP and w not in out:
+        if (w not in _STOP or (keep_domain and w in _DOMAIN)) and w not in out:
             out.append(w)
     return out
 
@@ -175,8 +181,8 @@ def crossref(query: str, rows: int = 5, timeout: float = 8.0) -> list[dict]:
         out = []
         for it in items:
             yr = (it.get("issued", {}).get("date-parts") or [[None]])[0][0]
-            au = ", ".join(a.get("family", "") for a in it.get("author", [])[:3]) + (" et al." if len(it.get("author", [])) > 3 else "")
-            out.append({"title": (it.get("title") or [""])[0], "authors": au, "year": yr, "doi": it.get("DOI"),
+            au = ", ".join(re.sub(r"<[^>]+>", "", a.get("family", "")) for a in it.get("author", [])[:3]) + (" et al." if len(it.get("author", [])) > 3 else "")
+            out.append({"title": html.unescape(html.unescape((it.get("title") or [""])[0])), "authors": au, "year": yr, "doi": it.get("DOI"),
                         "url": f"https://doi.org/{it['DOI']}" if it.get("DOI") else it.get("URL"),
                         "venue": (it.get("container-title") or [""])[0],
                         "abstract": re.sub(r"<[^>]+>", " ", it.get("abstract", "") or "").strip()[:600], "source": "Crossref (live)"})
@@ -304,6 +310,11 @@ class Librarian:
                           "relevance": round(sc_, 1), "source": "curated index (not live: verify before citing)", "url": None,
                           **assess(e, self.scenario)})
         self.cache[key] = found
+        try:
+            from . import library
+            library.record([{**p, "kind": "paper"} for p in found], f"{family or 'claim'}: {text.strip()[:80]}")
+        except Exception:  # noqa: BLE001  the library is bookkeeping; never break a run
+            pass
         return found
 
     def evidence(self, hyp: dict) -> dict:

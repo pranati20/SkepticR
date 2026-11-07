@@ -17,29 +17,38 @@ with sync_playwright() as p:
     pg.on("pageerror", lambda e: errors.append(str(e)))
     pg.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
     pg.goto(URL)
+
+    # chat tab is the default
+    assert "ask a question in plain english" in pg.inner_text("body").lower(), "chat tab missing"
+    pg.screenshot(path=str(OUT / "ask.png"))
+
+    # court: replay a recorded run
+    pg.get_by_role("button", name="Watch it work").click()
+    pg.get_by_text("Options", exact=True).click()
     pg.get_by_role("button", name="instant").click()
-    pg.get_by_role("button", name="▶ Replay cached run").click()
-    pg.wait_for_function("/graveyard · [1-9]/i.test(document.body.innerText) && document.body.innerText.includes('Ground truth check')", timeout=90000)
+    pg.get_by_role("button", name="▶ Start").click()
+    pg.wait_for_function("document.body.innerText.includes('strategy 1 of')", timeout=90000)
     pg.wait_for_timeout(2500)
-    txt = pg.inner_text("body")
-    low = txt.lower()
-    assert "credibility meter" in low and "ideas tried" in low, "meters missing"
-    assert "killed ideas" in low, "graveyard missing"
+    low = pg.inner_text("body").lower()
+    assert "cost of illusion" in low and "thrown out" in low, "cost of illusion card missing"
+    assert "ideas that were just luck" in low, "luck list missing"
     pg.screenshot(path=str(OUT / "court.png"), full_page=True)
-    pg.locator("text=Died").first.click()
-    pg.wait_for_timeout(800)
-    assert "prosecutor results" in pg.inner_text("body").lower(), "detail drawer did not open"
-    pg.screenshot(path=str(OUT / "drawer.png"))
-    pg.keyboard.press("Escape")
-    pg.get_by_role("button", name="Naive AI vs Skeptic").click(); pg.wait_for_timeout(600)
-    assert "naive ai analyst" in pg.inner_text("body").lower(); pg.screenshot(path=str(OUT / "split.png"), full_page=True)
-    pg.get_by_role("button", name="Benchmark").click(); pg.wait_for_timeout(2500)
-    t = pg.inner_text("body"); assert "skeptic (full court)" in t.lower() and "where skeptic fails" in t.lower()
-    pg.screenshot(path=str(OUT / "benchmark.png"), full_page=True)
-    pg.get_by_role("button", name="Replication").click(); pg.get_by_role("button", name="Replay example").click(); pg.wait_for_timeout(5000)
-    pg.get_by_role("button", name="instant").count()
+    pg.get_by_role("button", name="Show technical details").click()
+    assert "credibility meter" in pg.inner_text("body").lower(), "technical details missing"
+
+    pg.get_by_role("button", name="AI vs Skeptic").click(); pg.wait_for_timeout(600)
+    assert "naive ai analyst" in pg.inner_text("body").lower()
+    pg.screenshot(path=str(OUT / "split.png"), full_page=True)
+
+    pg.get_by_role("button", name="Papers it used").click(); pg.wait_for_timeout(800)
+    assert "built-in reference list" in pg.inner_text("body").lower(), "papers tab missing"
+    pg.screenshot(path=str(OUT / "papers.png"), full_page=True)
+
+    pg.get_by_role("button", name="Check a paper").click(); pg.wait_for_timeout(500)
     pg.screenshot(path=str(OUT / "replication.png"), full_page=True)
     b.close()
-real = [e for e in errors if "favicon" not in e]
-print("console/page errors:", real if real else "none")
-print("UI smoke test PASSED" if not real else "UI smoke test finished with errors")
+
+if errors:
+    print("console errors:", errors)
+    sys.exit(1)
+print("UI smoke OK")

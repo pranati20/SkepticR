@@ -119,12 +119,14 @@ def run_events(run_id: str, after: int = 0):
     return {"events": st["events"][after:], "done": st["done"], "next": len(st["events"])}
 
 
-@app.get("/api/benchmark")
-def benchmark():
-    f = DEMO / "benchmark.json"
-    if not f.exists():
-        raise HTTPException(404, "run: python -m skeptic.backend.benchmark.run_benchmark")
-    return JSONResponse(json.loads(f.read_text(encoding="utf-8")))
+@app.get("/api/library")
+def library_list():
+    """Papers/datasets looked at so far (live searches) plus the built-in curated reference list used by the Prosecutors."""
+    from . import library
+    from .literature import CORPUS
+    ref = [{"title": e["title"], "authors": e["authors"], "year": e["year"], "venue": e["venue"], "claim": e["claim"], "later": e.get("later", "")}
+           for e in CORPUS]
+    return {"looked_at": library.entries(), "reference": ref}
 
 
 @app.get("/api/demo")
@@ -182,37 +184,6 @@ def chat(body: dict):
         return _clean(run_chat(msgs))
     except ValueError as e:
         raise HTTPException(400, str(e))
-
-
-_NULLLAB: dict = {}
-
-
-@app.post("/api/nullrerun")
-def null_rerun(body: dict):
-    """Re-run the null-world audit on the synthetic benchmark with a chosen number of worlds (the UI's live slider)."""
-    import time
-    import numpy as np
-    from .adapters.synthetic import SynthConfig, generate
-    from .court import null_worlds as NW, stats as S
-    try:
-        n = int(max(50, min(MAX_WORLDS, body.get("n_worlds", 300))))
-        seed = int(body.get("seed", 0))
-    except (TypeError, ValueError):
-        raise HTTPException(400, "n_worlds and seed must be numbers")
-    if seed not in _NULLLAB:
-        if len(_NULLLAB) >= 8:
-            _NULLLAB.pop(next(iter(_NULLLAB)))
-        _NULLLAB[seed] = generate(SynthConfig(seed=seed))
-    d = _NULLLAB[seed]
-    t0 = time.time()
-    r = NW.run_null_worlds(d.pnl, d.factors, S.raw_t, "stationary_bootstrap", n, seed=seed + 7)
-    obs = np.abs(r.observed)
-    planted = [i for i in range(len(d.meta)) if d.meta[i]["kind"] == "planted"]
-    hi = float(max(r.null_max.max(), obs[planted].max())) * 1.05
-    counts, edges = np.histogram(r.null_max, bins=30, range=(0, hi))
-    return _clean({"n_worlds": n, "seconds": time.time() - t0,
-                   "histogram": {"counts": counts.tolist(), "edges": edges.tolist(), "p95": float(np.quantile(r.null_max, 0.95))},
-                   "planted": [{"id": d.meta[i]["id"], "stat": float(obs[i]), "p_adj": float(r.p_stepdown[i])} for i in planted]})
 
 
 @app.get("/api/sample/health")

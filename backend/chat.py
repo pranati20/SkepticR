@@ -37,9 +37,12 @@ SCHEMA = {"type": "object", "properties": {"action": {"enum": ["search_papers", 
 # ----------------------------------------------------------------------------------------------- tools
 def search_papers(query: str, rows: int = 5) -> tuple[list[dict], list[str]]:
     papers, notes = LIT.live_search(query, rows)
-    terms = LIT._terms(query)
+    terms = LIT._terms(query, True)
     scored = [(LIT._live_relevance(p, terms), p) for p in papers]
-    keep = [p for r, p in sorted(scored, key=lambda x: -x[0]) if r > 0][:rows]
+    # must mention at least half of the content words (title counts double), or it is just sharing filler words
+    need = max(1, (len(terms) + 1) // 2)
+    hit = lambda p: sum(t in (p["title"] + " " + (p.get("abstract") or "")).lower() for t in terms)
+    keep = [p for r, p in sorted(scored, key=lambda x: -x[0]) if r > 0 and hit(p) >= need][:rows]
     return [{"kind": "paper", "title": p["title"], "by": p["authors"], "year": p["year"], "venue": p["venue"], "url": p["url"],
              "snippet": (p.get("abstract") or "")[:300], "source": p["source"]} for p in keep], notes
 
@@ -47,7 +50,7 @@ def search_papers(query: str, rows: int = 5) -> tuple[list[dict], list[str]]:
 def _hf(query: str, rows: int, timeout: float = 8.0) -> list[dict]:
     def fetch():
         out, seen = [], set()
-        words = LIT._terms(query)
+        words = LIT._terms(query, True)
         for q in [" ".join(words[:2]), words[0] if words else query, words[1] if len(words) > 1 else ""]:   # HF search wants short queries
             if not q:
                 continue
@@ -67,7 +70,7 @@ def _hf(query: str, rows: int, timeout: float = 8.0) -> list[dict]:
 
 def _zenodo(query: str, rows: int, timeout: float = 8.0) -> list[dict]:
     def fetch():
-        url = "https://zenodo.org/api/records?" + urllib.parse.urlencode({"q": " AND ".join(LIT._terms(query)[:4]) or query, "type": "dataset", "size": rows, "sort": "bestmatch"})
+        url = "https://zenodo.org/api/records?" + urllib.parse.urlencode({"q": " AND ".join(LIT._terms(query, True)[:4]) or query, "type": "dataset", "size": rows, "sort": "bestmatch"})
         out = []
         for h in json.loads(LIT._get(url, timeout).decode())["hits"]["hits"]:
             m = h.get("metadata", {})
@@ -90,9 +93,10 @@ def search_datasets(query: str, rows: int = 5) -> tuple[list[dict], list[str]]:
             notes.append(f"{n}: {len(r)} results")
         except Exception as e:  # noqa: BLE001  one source failing must not stop the other
             notes.append(f"{n}: unavailable ({type(e).__name__})")
-    terms = LIT._terms(query)
+    terms = LIT._terms(query, True)
     rel = lambda d: sum(t in (d["title"] + " " + d["snippet"]).lower() for t in terms)
-    out = [d for d in out if d["url"] and d["title"] and rel(d) > 0]            # drop results that match none of the query words
+    need = max(1, (len(terms) + 1) // 2)
+    out = [d for d in out if d["url"] and d["title"] and rel(d) >= need]        # must match at least half the content words
     out.sort(key=lambda d: -rel(d))
     return out[:rows * 2], notes
 
@@ -104,9 +108,9 @@ TOOLS = {"search_papers": search_papers, "search_datasets": search_datasets}
 def _mock(hint: dict) -> dict:
     step = hint["step"]
     if step == 0:
-        return {"action": "search_papers", "query": hint["question"]}
+        return {"action": "search_papers", "query": " ".join(LIT._terms(hint["question"], True)[:6]) or hint["question"]}
     if step == 1:
-        return {"action": "search_datasets", "query": hint["question"]}
+        return {"action": "search_datasets", "query": " ".join(LIT._terms(hint["question"], True)[:6]) or hint["question"]}
     return {"action": "answer", "answer": ""}          # empty -> the caller writes the plain "raw results" message
 
 
@@ -182,5 +186,10 @@ def run_chat(messages: list[dict], llm: LLM | None = None) -> dict:
         answer = (f"I searched live and found {n_p} paper(s) and {n_d} dataset(s) for \"{question[:80]}\". " if sources else
                   f"I searched live but found nothing relevant for \"{question[:80]}\". Try different or fewer keywords. ") + \
                  ("No AI model is configured (set SKEPTIC_USE_LLM=1 and a key in .env), so this is the raw list, not an analysis." if llm.is_mock else "")
+    try:
+        from . import library
+        library.record(sources, f"chat: {question[:80]}")
+    except Exception:  # noqa: BLE001
+        pass
     return {"answer": answer, "sources": sources, "steps": steps, "llm": "offline (no model)" if llm.is_mock else llm.provider.name,
             "error": llm_error}
