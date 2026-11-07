@@ -297,3 +297,37 @@ def test_methods_endpoint_offline_finds_nothing():
     assert r.status_code == 200 and r.json()["topics"] and all(t["papers"] == [] for t in r.json()["topics"])
     assert "nothing to conclude" in r.json()["conclusion"]["text"]
     assert client.post("/api/methods", json={"style": 5}).status_code == 400
+
+
+def test_conclusion_uses_only_valid_findings(tmp_path):
+    import json
+    from skeptic.backend import conclude as CC, runner as R
+    from skeptic.backend.llm import LLM
+
+    seen = {}
+
+    class Spy:
+        name = "spy"
+
+        def complete(self, model, system, prompt, max_tokens):
+            seen["prompt"] = prompt
+            return json.dumps({"text": "Supported by [F1] and [F99]. See https://evil.example"}), 1, 1
+
+    ev, _ = R.run_scenario("health", {"n_worlds": 80, "question": "Do supplements help?"})
+    c = next(e for e in ev if e["type"] == "conclusion")
+    verd = {}
+    for e in ev:
+        if e["type"] == "verdict":
+            verd[e["hypothesis_id"]] = e
+    valid_ids = {k for k, v in verd.items() if v["verdict"] == "DISCOVERY"}
+    assert {f["id"] for f in c["findings"]} <= valid_ids and c["status"] in ("valid", "none")
+    rejected = [v["description"] for v in verd.values() if v["verdict"] != "DISCOVERY"]
+    assert rejected
+    import re as _re
+    listed = [_re.split(r" \(|;", ln.split("] ", 1)[1])[0] for ln in c["text"].splitlines() if ln.startswith("- [F")]
+    assert set(listed) <= {verd[k]["description"] for k in valid_ids}                # the summary lists valid findings only
+    if valid_ids:                                                                    # the model prompt never contains rejected ideas either
+        out = CC.conclude("Do supplements help?", ev, LLM(provider=Spy(), cache_dir=tmp_path, use_cache=False))
+        assert not any(("] " + d + " |") in seen["prompt"] for d in rejected) and "[F99]" not in out["text"] and "http" not in out["text"] and "[F1]" in out["text"]
+    none = CC.conclude("anything?", [{"type": "verdict", "hypothesis_id": "a", "verdict": "LUCK", "description": "lucky idea"}])
+    assert none["status"] == "none" and "No valid conclusion" in none["text"] and "lucky idea" not in none["text"]

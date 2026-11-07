@@ -18,12 +18,21 @@ with sync_playwright() as p:
     pg.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
     pg.goto(URL)
 
-    # chat tab is the default
+    # prompt-first flow is the default: question -> dataset -> audit -> conclusion from valid findings only
+    assert "what do you want to conclude" in pg.inner_text("body").lower(), "conclude tab missing"
+    pg.locator("textarea").first.fill("Does the new design increase conversion, and for whom?")
+    pg.get_by_role("button", name="Find the valid conclusion").click()
+    pg.wait_for_function("document.body.innerText.includes('Left out and not used')", timeout=180000)
+    low = pg.inner_text("body").lower()
+    assert "valid findings used" in low or "no valid conclusion" in low, "conclusion missing"
+    pg.screenshot(path=str(OUT / "conclude.png"), full_page=True)
+    pg.get_by_role("button", name="Find papers & data").click()
     assert "ask a question in plain english" in pg.inner_text("body").lower(), "chat tab missing"
     pg.screenshot(path=str(OUT / "ask.png"))
 
     # court: replay a recorded run
     pg.get_by_role("button", name="Watch it work").click()
+    pg.locator("select").first.select_option("market")
     pg.get_by_text("Options", exact=True).click()
     pg.get_by_role("button", name="instant").click()
     pg.get_by_role("button", name="▶ Start").click()

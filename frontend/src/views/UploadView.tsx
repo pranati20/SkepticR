@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { Banner, Card } from '../ui'
 
-export default function UploadView({ run, running, goCourt }: { run: (p: any) => void; running: boolean; goCourt: () => void }) {
+export default function UploadView({ run, running, goCourt, externalClaim, label }: { run: (p: any) => void; running: boolean; goCourt: () => void; externalClaim?: string; label?: string }) {
   const [csv, setCsv] = useState('')
   const [name, setName] = useState('')
   const [prof, setProf] = useState<any>(null)
-  const [claim, setClaim] = useState('')
+  const [claimOwn, setClaim] = useState('')
+  const claim = externalClaim ?? claimOwn
   const [treat, setTreat] = useState('')
   const [outcome, setOutcome] = useState('')
   const [subs, setSubs] = useState<string[]>([])
@@ -32,7 +33,7 @@ export default function UploadView({ run, running, goCourt }: { run: (p: any) =>
           <button className="btn" onClick={sample}>or load a sample (health, with a hidden confounder)</button>
           {name && <span className="text-xs text-mute">{name} · {prof?.rows?.toLocaleString()} rows</span>}
         </div>
-        <textarea value={claim} onChange={(e) => setClaim(e.target.value)} placeholder="Describe the claim, e.g. “users on the new plan spend more”" rows={2} className="mt-3 w-full rounded-lg border border-line bg-ink p-3 text-sm outline-none focus:border-accent" />
+        {externalClaim === undefined && <textarea value={claim} onChange={(e) => setClaim(e.target.value)} placeholder="Describe the claim, e.g. “users on the new plan spend more”" rows={2} className="mt-3 w-full rounded-lg border border-line bg-ink p-3 text-sm outline-none focus:border-accent" />}
         {err && <div className="mt-2"><Banner tone="rose">{err}</Banner></div>}
       </Card>
       {prof && (
@@ -44,8 +45,8 @@ export default function UploadView({ run, running, goCourt }: { run: (p: any) =>
             <div><div className="h-label mb-1">Known confounders (permute treatment within these; enables Simpson check)</div><div className="flex flex-wrap gap-1.5">{prof.columns.filter((c: any) => c.name !== treat && c.name !== outcome && c.n_unique <= 12).map((c: any) => (<button key={c.name} onClick={() => toggle(strata, setStrata, c.name)} className={`rounded-full border px-2 py-0.5 text-xs ${strata.includes(c.name) ? 'border-amber-400 bg-amber-400/20 text-white' : 'border-line text-mute'}`}>{c.name}</button>))}</div></div>
           </div>
           <div className="mt-4 flex items-center gap-3">
-            <button className="btn-primary" disabled={running || !treat || !outcome} onClick={() => { run({ csv, treat, outcome, subgroups: subs, strata, claim }); goCourt() }}>Put my claim on trial</button>
-            <span className="text-xs text-mute">Results appear in the Court tab.</span>
+            <button className="btn-primary" disabled={running || !treat || !outcome} onClick={() => { run({ csv, treat, outcome, subgroups: subs, strata, claim }); goCourt() }}>{label || 'Put my claim on trial'}</button>
+            {!externalClaim && <span className="text-xs text-mute">Results appear in the Court tab.</span>}
           </div>
           <div className="mt-3 overflow-x-auto"><table className="text-xs"><thead><tr>{prof.columns.map((c: any) => <th key={c.name} className="px-2 text-left text-mute">{c.name}</th>)}</tr></thead><tbody>{prof.preview.map((r: any, i: number) => <tr key={i}>{prof.columns.map((c: any) => <td key={c.name} className="px-2 font-mono text-slate-400">{String(r[c.name]).slice(0, 14)}</td>)}</tr>)}</tbody></table></div>
         </Card>)}

@@ -406,5 +406,12 @@ def run_scenario(name: str, params: dict | None = None, emit: Callable[[dict], N
         import traceback
         ctx.emit("error", message=f"{type(e).__name__}: {e}", trace=traceback.format_exc()[-1500:])
         raise
+    q = params.get("question")
+    if isinstance(q, str) and q.strip():                      # prompt-first flow: conclude from the VALID findings only
+        from . import conclude as CC
+        try:
+            ctx.emit("conclusion", **CC.conclude(q, ctx.events, ctx.llm))
+        except Exception as e:  # noqa: BLE001
+            ctx.emit("error", message=f"Could not write the conclusion: {type(e).__name__}: {e}")
     ctx.emit("done", scenario=name, seconds=round(time.time() - ctx.t0, 1))
     return ctx.events, out

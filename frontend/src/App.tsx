@@ -5,9 +5,9 @@ import CourtView from './views/CourtView'
 import SplitView from './views/SplitView'
 import PapersView from './views/PapersView'
 import ReplicationView from './views/ReplicationView'
-import UploadView from './views/UploadView'
 import ChatView from './views/ChatView'
 import MethodsView from './views/MethodsView'
+import ConcludeView from './views/ConcludeView'
 
 const SCENARIOS = [
   { id: 'market', label: 'Stock-picking AI (simulated stocks)' },
@@ -18,14 +18,14 @@ const SCENARIOS = [
   { id: 'ab_test', label: 'A/B test (peeking trap)' },
 ]
 const TABS = [
-  ['ask', 'Ask the assistant'], ['court', 'Watch it work'], ['upload', 'Check my data'], ['replicate', 'Check a paper'],
+  ['conclude', 'Find a conclusion'], ['ask', 'Find papers & data'], ['court', 'Watch it work'], ['replicate', 'Check a paper'],
   ['split', 'AI vs Skeptic'], ['methods', 'Improve the algorithm'], ['papers', 'Papers it used'],
 ] as const
 
 export default function App() {
   const [s, dispatch] = useReducer(reduce, undefined, initialState)
   const run = useRun(dispatch)
-  const [tab, setTab] = useState<(typeof TABS)[number][0]>('ask')
+  const [tab, setTab] = useState<(typeof TABS)[number][0]>('conclude')
   const [scenario, setScenario] = useState('market')
   const [mode, setMode] = useState<'demo' | 'live'>('demo')
   const [chatCtx, setChatCtx] = useState<{ question: string; papers: any[] } | null>(null)
@@ -98,7 +98,7 @@ export default function App() {
       {tab === 'split' && <SplitView s={s} />}
       {tab === 'papers' && <PapersView />}
       {tab === 'replicate' && <ReplicationView s={s} running={run.running} run={(p) => run.live('replication', p)} demo={() => run.demo('replication')} />}
-      {tab === 'upload' && <UploadView running={run.running} run={(p) => run.live('upload', p)} goCourt={() => setTab('court')} />}
+      {tab === 'conclude' && <ConcludeView s={s} running={run.running} run={(sc, p) => { setScenario(sc); run.live(sc, p) }} goCourt={() => setTab('court')} />}
 
       <footer className="mt-10 rounded-2xl border border-line bg-panel/60 p-4 text-xs leading-relaxed text-mute">
         <details><summary className="h-label cursor-pointer">Important limits (click to read)</summary>

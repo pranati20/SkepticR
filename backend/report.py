@@ -60,6 +60,14 @@ def build_pdf(events: list[dict]) -> bytes:
     f.append(Paragraph(f"{_t(meta.get('title', 'Run'), 90)} &nbsp;|&nbsp; generated {time.strftime('%Y-%m-%d %H:%M')} &nbsp;|&nbsp; "
                        f"{_t(meta.get('blurb', ''), 140)}", S))
 
+    concl = (by("conclusion") or [None])[-1]
+    if concl:
+        f.append(Paragraph("Question and conclusion (from valid findings only)", H2))
+        f.append(Paragraph("<b>Question:</b> " + _t(concl.get("question"), 300), B))
+        for line in str(concl.get("text", "")).splitlines()[:14]:
+            if line.strip():
+                f.append(Paragraph(_t(line, 260), B))
+
     # --- headline
     total = len(vs)
     f.append(Paragraph("Conclusion", H2))
