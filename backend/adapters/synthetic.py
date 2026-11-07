@@ -35,6 +35,7 @@ class SynthConfig:
     n_lookahead: int = 3
     n_survivor: int = 2
     cost_bps_default: float = 3.0
+    n_holdout: int = 252                    # later slice never touched during search (pre-registration scoring)
     seed: int = 0
 
 
@@ -46,6 +47,8 @@ class SynthData:
     factors: np.ndarray        # (T, 4) factor returns aligned with pnl dates
     factor_names: list
     returns: np.ndarray        # (T, N) next-day asset returns aligned with pnl dates
+    pnl_holdout: np.ndarray = None       # (K, H) later slice, never used by search
+    factors_holdout: np.ndarray = None   # (H, 4)
     meta: list = field(default_factory=list)   # list of dict, length K
 
     @property
@@ -83,7 +86,7 @@ def _weights(S):
 def generate(cfg: SynthConfig | None = None) -> SynthData:
     cfg = cfg or SynthConfig()
     rng = np.random.default_rng(cfg.seed)
-    T, N, K = cfg.n_days, cfg.n_assets, cfg.n_signals
+    T, N, K = cfg.n_days + cfg.n_holdout, cfg.n_assets, cfg.n_signals
     T1 = T + 1
 
     # --- shared stochastic volatility path (clustering) ---
@@ -200,5 +203,7 @@ def generate(cfg: SynthConfig | None = None) -> SynthData:
                 "factor_loading": {"decoy_val": "VAL", "decoy_mom": "MOM"}.get(kind),
             },
         })
-    return SynthData(cfg=cfg, pnl=pnl, turnover=turn, factors=F[1:T1], factor_names=FACTOR_NAMES,
-                     returns=Rn.astype(np.float32), meta=meta)
+    S_ = cfg.n_days
+    return SynthData(cfg=cfg, pnl=pnl[:, :S_], turnover=turn, factors=F[1:T1][:S_], factor_names=FACTOR_NAMES,
+                     returns=Rn[:S_].astype(np.float32), meta=meta,
+                     pnl_holdout=pnl[:, S_:], factors_holdout=F[1:T1][S_:])
