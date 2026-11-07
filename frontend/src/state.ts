@@ -20,6 +20,7 @@ export interface RunState {
   portfolio: any
   truth: any
   literature: any[]
+  illusions: any[]
   replication: { extracted?: any; decay?: any }
   backtest: { done: number; total: number } | null
   phase: string
@@ -31,7 +32,7 @@ export interface RunState {
 export const initialState = (): RunState => ({
   meta: null, dataQuality: null, naive: null, proposals: [], feed: [], active: {}, ledger: { tests: 0, cleaning_choices: 0, agents: 0, potential_paths: 0 },
   credibility: { wealth: 0, wealth0: 0, history: [] }, tokens: null, audits: [], prosecutions: {}, verdicts: {}, graveyard: [], prereg: {}, cards: {},
-  portfolio: null, truth: null, literature: [], replication: {}, backtest: null, phase: 'idle', done: false, error: null, n: 0,
+  portfolio: null, truth: null, literature: [], illusions: [], replication: {}, backtest: null, phase: 'idle', done: false, error: null, n: 0,
 })
 
 const hunterNode = (fam: string) => `${fam}-hunter`
@@ -53,6 +54,7 @@ export function reduce(s: RunState, a: any): RunState {
     case 'backtest_progress': return { ...s, n, backtest: { done: e.done, total: e.total }, active: act(['Backtester']) }
     case 'ledger': return { ...s, n, ledger: e }
     case 'naive': return { ...s, n, naive: e }
+    case 'illusion': return { ...s, n, illusions: [...s.illusions, e], active: act(['Judge']) }
     case 'literature': return { ...s, n, literature: [...s.literature, e], active: act(['Librarian']) }
     case 'null_audit': return { ...s, n, audits: [...s.audits, e], active: act(['Court']), phase: 'Court' }
     case 'prosecution': {

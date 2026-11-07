@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 // Pacing so the swarm is watchable. Per-event delay in ms (scaled by speed; 0 = instant).
 const DELAY: Record<string, number> = {
   proposal: 34, agent: 380, null_audit: 700, prosecution: 110, verdict: 14, graveyard: 80, credibility: 450, ledger: 12, tokens: 4,
-  prereg: 200, strategy_card: 250, naive: 500, meta: 300, truth_check: 600, literature: 300, replication: 500, data_quality: 350, backtest_progress: 30,
+  prereg: 200, strategy_card: 250, naive: 500, meta: 300, truth_check: 600, literature: 300, illusion: 450, replication: 500, data_quality: 350, backtest_progress: 30,
 }
 
 export type Mode = 'demo' | 'live'

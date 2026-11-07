@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { RunState, VERDICT_COLOR, counts } from '../state'
-import { ATTACK_NAMES, Banner, Card, Drawer, Gauge, Hist, Pill, Stat, Tombstone, fmt, pct, useNow } from '../ui'
+import IllusionCard from './IllusionCard'
+import { ATTACK_NAMES, VERDICT_PLAIN, Banner, Card, Drawer, Gauge, Hist, Pill, Stat, Tombstone, fmt, pct, useNow } from '../ui'
 
 // ---------------------------------------------------------------- swarm graph
 const PROS = ['leakage', 'survivorship', 'costs', 'regime', 'concentration', 'confounder', 'fragility', 'literature', 'simpson', 'peeking', 'placebo']
@@ -184,13 +185,25 @@ export function Detail({ s, id }: { s: RunState; id: string }) {
 // ---------------------------------------------------------------- main view
 export default function CourtView({ s, compact = false }: { s: RunState; compact?: boolean }) {
   const [sel, setSel] = useState<string | null>(null)
+  const [tech, setTech] = useState(false)
   const c = counts(s)
+  const total = s.proposals.length
   const audit = s.audits[s.audits.length - 1]
   const discs = Object.values(s.verdicts).filter((v: any) => v.verdict === 'DISCOVERY')
   const maybe = Object.values(s.verdicts).filter((v: any) => v.verdict === "CAN'T TELL YET")
   const topMarks = (audit?.top_observed || []).slice(0, 3).map((t: any) => ({ x: t.stat, label: `best found ${fmt(t.stat, 1)}`, color: '#34d399' }))
   return (
     <div className="space-y-4">
+      <IllusionCard s={s} />
+      <div className="card flex flex-wrap items-center gap-3 p-4">
+        <div className="min-w-0 flex-1 text-sm leading-relaxed text-slate-200">
+          {total === 0 ? (<>An AI tries lots of ideas on some data. Then a “court” tries hard to prove each idea is <b>just luck</b>. Pick an example above and press <b>Start</b>.</>) : (<>
+            The AI tried <b>{total}</b> ideas. <b className="text-disc">{c.DISCOVERY}</b> survived every check, <b className="text-luck">{c.LUCK}</b> turned out to be luck,
+            and <b className="text-maybe">{c.CANT}</b> can’t be judged yet (not enough data). {s.done ? '' : 'Still working…'}
+            <div className="mt-1 text-xs text-mute">“Survived” means it passed our tests. It does not prove the idea is true, and it is not investment advice.</div></>)}
+        </div>
+        <button className="btn" onClick={() => setTech(!tech)}>{tech ? 'Hide technical details' : 'Show technical details'}</button>
+      </div>
       {s.error && <Banner tone="rose">{s.error}</Banner>}
       {s.meta?.standin && <Banner>{s.meta?.panel?.note || 'Simulated stand-in data.'} All results are demonstrations; ground truth {s.truth ? 'is' : 'may be'} known to the simulator.</Banner>}
       {s.meta?.panel?.survivorship_bias && <Banner tone="rose">Survivorship warning: this universe contains only companies that are still listed today.</Banner>}
@@ -201,24 +214,24 @@ export default function CourtView({ s, compact = false }: { s: RunState; compact
         </Banner>
       )}
       <div className="grid gap-4 xl:grid-cols-3">
-        <Card title="Live swarm" right={<span className="text-xs text-mute">{s.phase}</span>} className="xl:col-span-2">
-          <SwarmGraph s={s} />
-          <div className="mt-2 border-t border-line pt-3"><Feed s={s} /></div>
+        <Card title="What’s happening" right={<span className="text-xs text-mute">{s.phase}</span>} className={tech ? 'xl:col-span-2' : 'xl:col-span-3'}>
+          {tech && <SwarmGraph s={s} />}
+          <div className={tech ? 'mt-2 border-t border-line pt-3' : ''}><Feed s={s} /></div>
           {s.backtest && !s.done && s.backtest.done < s.backtest.total && <div className="mt-2 text-xs text-mute">backtesting {s.backtest.done}/{s.backtest.total} (zero tokens)…</div>}
         </Card>
-        <Card title="Credibility Meter" right={<span className="text-[11px] text-mute">Foster–Stine alpha-investing</span>}>
+        {tech && <Card title="Credibility Meter" right={<span className="text-[11px] text-mute">Foster–Stine alpha-investing</span>}>
           <Gauge value={s.credibility.wealth} max={Math.max(s.credibility.wealth0 * 3, s.credibility.wealth, 0.1)} start={s.credibility.wealth0 || 0.09} />
           <div className="text-xs text-mute">Each round of tests spends wealth; validated discoveries earn some back. Low wealth forces the swarm to be selective.</div>
           {audit && <div className="mt-2 text-xs">Current level to beat: <span className="font-mono text-accent">{fmt(audit.level, 3)}</span></div>}
-        </Card>
+        </Card>}
       </div>
-      <Card title="Ledger"><LedgerTicker s={s} /></Card>
+      {tech && <Card title="Ledger"><LedgerTicker s={s} /></Card>}
       <div className="grid gap-4 xl:grid-cols-3">
-        <Card title="Verdicts" className="xl:col-span-1">
+        <Card title="Results" className={tech ? 'xl:col-span-1' : 'xl:col-span-3'}>
           <div className="grid grid-cols-3 gap-2 text-center">
             {[['DISCOVERY', c.DISCOVERY], ['LUCK', c.LUCK], ["CAN'T TELL YET", c.CANT]].map(([k, n]: any) => (
               <div key={k} className="rounded-xl border border-line p-2" style={{ background: VERDICT_COLOR[k] + '10' }}>
-                <div className="font-mono text-3xl font-semibold" style={{ color: VERDICT_COLOR[k] }}>{n}</div><div className="text-[10px] tracking-wide text-mute">{k}</div>
+                <div className="font-mono text-3xl font-semibold" style={{ color: VERDICT_COLOR[k] }}>{n}</div><div className="text-[11px] tracking-wide text-mute">{VERDICT_PLAIN[k]}</div>
               </div>))}
           </div>
           {s.truth && (
@@ -239,22 +252,22 @@ export default function CourtView({ s, compact = false }: { s: RunState; compact
               </button>))}
           </div>
         </Card>
-        <Card title="Null-world evidence" className="xl:col-span-1">
+        {tech && <Card title="Null-world evidence" className="xl:col-span-1">
           {audit ? (<>
             <div className="text-xs text-mute mb-1">Round {audit.round + 1}: the best result luck produced when the whole {audit.search_size}-idea search was re-run in null worlds where nothing is real.</div>
             <Hist hist={audit.histogram} marks={topMarks} height={170} />
           </>) : <div className="text-sm text-mute">No audit yet.</div>}
-        </Card>
-        <Card title="Cost & tokens" className="xl:col-span-1"><TokenMeter s={s} /></Card>
+        </Card>}
+        {tech && <Card title="Cost & tokens" className="xl:col-span-1"><TokenMeter s={s} /></Card>}
       </div>
-      {s.portfolio && s.portfolio.ids.length > 1 && (
+      {tech && s.portfolio && s.portfolio.ids.length > 1 && (
         <Card title="Survivors as a portfolio">
           <div className="text-xs text-slate-300">Combined Sharpe <b>{fmt(s.portfolio.combined_sharpe)}</b> vs average single {fmt(s.portfolio.mean_individual_sharpe)}. Correlation matrix of {s.portfolio.ids.length} survivors:</div>
           <div className="mt-2 overflow-x-auto"><div className="inline-grid gap-px" style={{ gridTemplateColumns: `repeat(${s.portfolio.ids.length}, 22px)` }}>
             {s.portfolio.correlation.flat().map((x: number, i: number) => (<div key={i} title={fmt(x)} className="h-[22px] w-[22px] rounded-sm" style={{ background: `rgba(56,189,248,${Math.abs(x)})` }} />))}
           </div></div>
         </Card>)}
-      <Card title={`The Graveyard · ${s.graveyard.length} killed ideas`} right={<span className="text-xs text-mute">click a tombstone for the evidence</span>}>
+      <Card title={`Ideas that were just luck · ${s.graveyard.length}`} right={<span className="text-xs text-mute">click a tombstone for the evidence</span>}>
         {s.graveyard.length === 0 && <div className="text-sm text-mute">Nothing has died yet.</div>}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6">
           {s.graveyard.map((g) => <Tombstone key={g.hypothesis_id} g={g} onClick={() => setSel(g.hypothesis_id)} />)}

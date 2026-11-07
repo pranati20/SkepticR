@@ -31,11 +31,13 @@ export function Stat({ label, value, sub, color }: { label: string; value: React
   )
 }
 
+export const VERDICT_PLAIN: Record<string, string> = { DISCOVERY: 'Looks real', LUCK: 'Probably luck', "CAN'T TELL YET": 'Not enough data' }
+
 export function Pill({ verdict }: { verdict: string }) {
   const c = VERDICT_COLOR[verdict] || '#94a3b8'
   return (
     <span className="rounded-full border px-2 py-0.5 text-[11px] font-semibold tracking-wide" style={{ color: c, borderColor: c + '66', background: c + '14' }}>
-      {verdict}
+      {VERDICT_PLAIN[verdict] || verdict}
     </span>
   )
 }

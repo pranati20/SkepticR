@@ -153,3 +153,70 @@ def test_gemini_provider_request_and_parse(monkeypatch):
     obj, u = llm.complete_json("judge", "sys", "prompt")
     assert obj == {"ok": True} and (u.tokens_in, u.tokens_out) == (7, 3) and u.model == "gemini-4-argon"
     assert seen["url"].endswith("/models/gemini-4-argon:generateContent") and seen["key"] == "k"
+
+
+# ---------------- chat agent
+def _fake_sources(monkeypatch):
+    from skeptic.backend import chat as C
+    paper = {"kind": "paper", "title": "Momentum in stock returns", "by": "Doe", "year": 2012, "venue": "J", "url": "https://doi.org/10.1/p",
+             "snippet": "abstract", "source": "Crossref (live)"}
+    data = {"kind": "dataset", "title": "org/stock-prices", "by": "org", "year": "2024", "venue": "1 downloads", "url": "https://huggingface.co/datasets/org/stock-prices",
+            "snippet": "daily prices", "source": "Hugging Face (live)"}
+    monkeypatch.setitem(C.TOOLS, "search_papers", lambda q, rows=5: ([paper], ["Crossref: 1 results"]))
+    monkeypatch.setitem(C.TOOLS, "search_datasets", lambda q, rows=5: ([data], ["Hugging Face: 1 results"]))
+    return C
+
+
+def test_chat_offline_returns_only_real_results(monkeypatch):
+    C = _fake_sources(monkeypatch)
+    r = C.run_chat([{"role": "user", "content": "momentum stock returns"}])
+    assert [s["url"] for s in r["sources"]] == ["https://doi.org/10.1/p", "https://huggingface.co/datasets/org/stock-prices"]
+    assert "1 paper" in r["answer"] and "No AI model" in r["answer"]
+
+
+def test_chat_strips_invented_links_and_citations(monkeypatch):
+    C = _fake_sources(monkeypatch)
+
+    class Fake:
+        is_mock = False
+        class provider: name = "fake"
+        n = 0
+        def register_mock(self, *a): pass
+        def complete_json(self, role, system, prompt, schema, mock_hint=None, max_tokens=0):
+            self.n += 1
+            if self.n == 1:
+                return {"action": "search_papers", "query": "momentum"}, None
+            return {"action": "answer", "answer": "See [S1] and [S9] or http://made-up.example/paper"}, None
+    r = C.run_chat([{"role": "user", "content": "momentum?"}], llm=Fake())
+    assert "[S1]" in r["answer"] and "[S9]" not in r["answer"] and "made-up.example" not in r["answer"]
+
+
+def test_chat_llm_failure_still_gives_results(monkeypatch):
+    C = _fake_sources(monkeypatch)
+
+    class Boom:
+        is_mock = False
+        class provider: name = "x"
+        def register_mock(self, *a): pass
+        def complete_json(self, *a, **k): raise RuntimeError("401 bad key")
+    r = C.run_chat([{"role": "user", "content": "q"}], llm=Boom())
+    assert r["error"] and len(r["sources"]) == 2 and "could not be reached" in r["answer"]
+
+
+def test_chat_endpoint_validation(monkeypatch):
+    _fake_sources(monkeypatch)
+    assert client.post("/api/chat", json={}).status_code == 400
+    assert client.post("/api/chat", json={"messages": [{"role": "assistant", "content": "hi"}]}).status_code == 400
+    r = client.post("/api/chat", json={"messages": [{"role": "user", "content": "momentum"}]})
+    assert r.status_code == 200 and len(r.json()["sources"]) == 2
+
+
+def test_illusion_events_compare_backtest_with_reality():
+    from skeptic.backend.runner import run_scenario
+    ev = []
+    run_scenario("synthetic", {"n_worlds": 100}, ev.append, 0)
+    il = [e for e in ev if e["type"] == "illusion"]
+    assert il and len(il) <= 8
+    for e in il:
+        assert e["in_total"] > 0 and len(e["in_curve"]) == len(e["real_curve"]) and e["basis"] and e["cause"]
+        assert abs(e["in_curve"][-1] - e["in_total"]) < 1e-6

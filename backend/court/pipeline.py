@@ -170,6 +170,7 @@ class Court:
         port = cards.portfolio_view(search, discoveries, cfg.attack.cost_bps) if has_pnl else None
         if port:
             self._e("portfolio", **port)
+        self._emit_illusions(search, verdicts, tstat_all)
         result = {"verdicts": {search.hyps[i]["id"]: verdicts[i].to_dict() for i in order},
                   "discoveries": [search.hyps[i]["id"] for i in discoveries], "rounds": round_log,
                   "alpha_history": ai.history, "ledger": self.ledger.effective_search_size(run_id),
@@ -178,6 +179,57 @@ class Court:
                   "tokens": self.meter.snapshot()}
         self._e("done", summary={"discoveries": len(discoveries), "tested": K})
         return result
+
+
+def _curve(x: np.ndarray, n: int) -> list[float]:
+    """Cumulative series, downsampled to at most n points (for the UI)."""
+    c = np.cumsum(np.nan_to_num(x))
+    idx = np.unique(np.linspace(0, len(c) - 1, min(n, len(c))).astype(int))
+    return [float(c[i]) for i in idx]
+
+
+def _reality(self, search: Search, i: int, v, cfg_attack) -> tuple[np.ndarray, str]:
+    """What the strategy really delivers once the Judge's finding is taken into account (same period as the backtest)."""
+    pnl = search.pnl[i]
+    killers = sorted([a for a in v.attacks if a.get("severity") == "high" and not a.get("survived", True)],
+                     key=lambda a: J.KILL_PRIORITY.index(a["attack"]) if a["attack"] in J.KILL_PRIORITY else 99)
+    cause = killers[0]["attack"] if killers else None
+    ev = killers[0].get("evidence", {}) if killers else {}
+    try:
+        if cause == "costs" and search.turnover is not None:
+            return pnl - float(search.turnover[i]) * cfg_attack.cost_bps / 1e4, "the same trades after trading costs"
+        if cause == "leakage" and search.rerun is not None:
+            return np.asarray(search.rerun(i, extra_lag=1), float), "re-run using only information available at the time"
+        if cause == "survivorship" and search.rerun is not None:
+            return np.asarray(search.rerun(i, universe="point_in_time"), float), "re-run including companies that later disappeared"
+        if cause == "placebo" and "roi_random_side_pct" in ev:
+            n_bets = max(1, int(search.hyps[i].get("spec", {}).get("n_bets", 1)))
+            return np.full(len(pnl), ev["roi_random_side_pct"] / 100 * n_bets / len(pnl)), "the same number of bets placed on a random side"
+    except Exception:  # noqa: BLE001  a failed re-run falls back to the held-out data
+        pass
+    rate = float(search.pnl_hold[i].mean())
+    return np.full(len(pnl), rate), "its average result on fresh data it was never tuned on"
+
+
+def _emit_illusions(self, search: Search, verdicts: dict, tstat_all: np.ndarray, top: int = 8):
+    """'Cost of illusion': strategies the Judge threw out as LUCK that nevertheless looked profitable in the backtest.
+    Compares what the backtest promised with what the strategy really delivers over the same period (see _reality)."""
+    if search.pnl is None or search.pnl_hold is None or search.null_fn is not None:
+        return
+    lucky = [i for i, v in verdicts.items() if v.verdict == J.LUCK and search.pnl[i].sum() > 0 and tstat_all[i] >= 2.0]
+    lucky.sort(key=lambda i: -float(search.pnl[i].sum()))
+    kind = "bets" if search.domain == "betting" else "returns"
+    for i in lucky[:top]:
+        v, h = verdicts[i], search.hyps[i]
+        real, basis = _reality(self, search, i, v, self.cfg.attack)
+        self._e("illusion", hypothesis_id=h["id"], description=h.get("description"), formula=h.get("spec", {}).get("formula"),
+                cause=v.cause_of_death, p_adj=v.p_adj, kind=kind, n_lucky_total=len(lucky), basis=basis,
+                in_curve=_curve(search.pnl[i], 120), real_curve=_curve(real, 120),
+                in_total=float(search.pnl[i].sum()), real_total=float(np.nansum(real)), hold_total=float(search.pnl_hold[i].sum()),
+                n_in=int(search.pnl.shape[1]), n_hold=int(search.pnl_hold.shape[1]), t_in=float(tstat_all[i]))
+
+
+Court._emit_illusions = _emit_illusions
 
 
 def score_against_truth(search: Search, result: dict) -> dict:

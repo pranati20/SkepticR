@@ -171,6 +171,19 @@ def upload(body: dict):
             "preview": json.loads(df.head(5).to_json(orient="records"))}
 
 
+@app.post("/api/chat")
+def chat(body: dict):
+    """Research assistant: finds papers and datasets live and explains them. Sources come only from real API results."""
+    from .chat import run_chat
+    msgs = body.get("messages") if isinstance(body, dict) else None
+    if not isinstance(msgs, list) or not msgs or not all(isinstance(m, dict) and isinstance(m.get("content"), str) for m in msgs):
+        raise HTTPException(400, "body must be {\"messages\": [{\"role\": \"user\", \"content\": \"...\"}]}")
+    try:
+        return _clean(run_chat(msgs))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
 _NULLLAB: dict = {}
 
 
