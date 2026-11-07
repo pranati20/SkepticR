@@ -62,7 +62,7 @@ class Court:
         if (rounds < 0).any():
             rounds = np.concatenate([np.full(len(c), i) for i, c in enumerate(np.array_split(np.arange(K), cfg.n_rounds))])
         n_rounds = int(rounds.max()) + 1
-        tstat_all = S.tstat(search.pnl)
+        tstat_all = search.obs()
         if log_tests:
             self.ledger.record_many(run_id, [{
                 "agent": h.get("agent", "hunter"), "family": h.get("family"), "hypothesis_id": h["id"], "spec": h.get("spec"),
@@ -76,7 +76,10 @@ class Court:
             cum = np.where(rounds <= r)[0]
             self._e("agent", agent="Court", text=f"Round {r+1}/{n_rounds}: re-running the whole search ({len(cum)} ideas) in "
                     f"{cfg.n_worlds} null worlds", round=r)
-            null = NW.run_null_worlds(search.pnl[cum], search.factors, S.raw_t, cfg.method, cfg.n_worlds, seed=cfg.seed + 101 * r)
+            if search.null_fn is not None:
+                null = search.null_fn(cum, cfg.n_worlds, cfg.seed + 101 * r)
+            else:
+                null = NW.run_null_worlds(search.pnl[cum], search.factors, S.raw_t, cfg.method, cfg.n_worlds, seed=cfg.seed + 101 * r)
             self.meter.stat("null_world_search_runs", cfg.n_worlds * len(cum))
             pos = {int(i): j for j, i in enumerate(cum)}
             conf = J.confidence_scores(null.p_unadjusted)
@@ -90,17 +93,23 @@ class Court:
                     histogram=_hist(null.null_max, [float(obs_abs[t]) for t in top]),
                     top_observed=[{"id": search.hyps[int(cum[t])]["id"], "stat": float(obs_abs[t])} for t in top])
             cands = [int(i) for i in batch if null.observed[pos[int(i)]] > 0 and null.p_stepdown[pos[int(i)]] <= level]
-            self._e("agent", agent="Court", text=f"{len(cands)} candidate(s) beat the null at level {level:.3f}; sending to the Prosecutors", round=r)
+            # prosecute every plausible candidate, not just winners: a borderline "CAN'T TELL" that is really a
+            # decoy must not carry a high stated confidence
+            tab = search.null_fn is not None          # tabular claims: a sign reversal or an interim-look claim must be prosecuted too
+            to_pros = [int(i) for i in batch if ((null.observed[pos[int(i)]] > 0 or tab) and null.p_stepdown[pos[int(i)]] < cfg.p_luck)
+                       or search.hyps[int(i)].get("spec", {}).get("peeked_at_look") is not None]
+            self._e("agent", agent="Court", text=f"{len(cands)} candidate(s) beat the null at level {level:.3f}; {len(to_pros)} borderline-or-better sent to the Prosecutors", round=r)
             attacks: dict[int, list] = {}
-            if cands and cfg.run_prosecutors:
+            if to_pros and cfg.run_prosecutors:
                 # confounder attack evidence: audit the factor-ADJUSTED alpha across the same whole search
-                if search.alpha_adj_p is None:
-                    search.alpha_adj_p = np.full(K, np.nan)
-                nullA = NW.run_null_worlds(search.pnl[cum], search.factors, S.alpha_t, cfg.method, cfg.n_worlds, seed=cfg.seed + 303 * (r + 1))
-                self.meter.stat("null_world_search_runs", cfg.n_worlds * len(cum))
-                search.alpha_adj_p[cum] = nullA.p_stepdown
+                if search.pnl is not None and search.domain in ("market", "synthetic") and search.null_fn is None:
+                    if search.alpha_adj_p is None:
+                        search.alpha_adj_p = np.full(K, np.nan)
+                    nullA = NW.run_null_worlds(search.pnl[cum], search.factors, S.alpha_t, cfg.method, cfg.n_worlds, seed=cfg.seed + 303 * (r + 1))
+                    self.meter.stat("null_world_search_runs", cfg.n_worlds * len(cum))
+                    search.alpha_adj_p[cum] = nullA.p_stepdown
                 with ThreadPoolExecutor(max_workers=4) as ex:
-                    futs = {k: ex.submit(prosecute, search, k, cfg.attack, None, self.llm_review) for k in cands}
+                    futs = {k: ex.submit(prosecute, search, k, cfg.attack, None, self.llm_review) for k in to_pros}
                     for k, f in futs.items():
                         attacks[k] = f.result()
                         self.meter.stat("prosecutor_attacks", len(attacks[k]))
@@ -138,19 +147,25 @@ class Court:
         # ---------------- pre-registration + out-of-sample scoring + strategy cards
         order = sorted(verdicts)
         discoveries = [i for i in order if verdicts[i].verdict == J.DISCOVERY]
-        sr_all = S.sharpe(search.pnl) / np.sqrt(252)
-        sr_var = float(np.nanvar(sr_all))
+        has_pnl = search.pnl is not None and search.null_fn is None
+        sr_var = float(np.nanvar(S.sharpe(search.pnl) / np.sqrt(252))) if has_pnl else 0.0
         out_cards, prer = {}, {}
         for i in discoveries:
             if cfg.preregister:
                 rec = prereg.register(self.ledger, run_id, search.hyps[i]["id"], search.hyps[i].get("spec", {}), +1,
-                                      {"holdout_days": int(search.pnl_hold.shape[1])})
-                res = prereg.score_out_of_sample(self.ledger, rec, search.pnl_hold[i])
+                                      {"holdout_obs": int(search.pnl_hold.shape[1]) if search.pnl_hold is not None else search.meta.get("n_holdout")})
+                res = search.oos_fn(i) if search.oos_fn else prereg.score_out_of_sample(self.ledger, rec, search.pnl_hold[i])
+                if search.oos_fn:
+                    with self.ledger._lock:
+                        self.ledger._db.executescript(prereg._SCHEMA)
+                        self.ledger._db.execute("UPDATE prereg SET result=? WHERE hash=?", (__import__("json").dumps(res), rec["hash"]))
+                        self.ledger._db.commit()
                 prer[i] = {**rec, "oos": res}
                 self._e("prereg", **prer[i])
-            out_cards[i] = cards.strategy_card(search, i, verdicts[i].to_dict(), K, sr_var, cfg.attack.cost_bps)
-            self._e("strategy_card", **out_cards[i])
-        port = cards.portfolio_view(search, discoveries, cfg.attack.cost_bps)
+            if has_pnl:
+                out_cards[i] = cards.strategy_card(search, i, verdicts[i].to_dict(), K, sr_var, cfg.attack.cost_bps)
+                self._e("strategy_card", **out_cards[i])
+        port = cards.portfolio_view(search, discoveries, cfg.attack.cost_bps) if has_pnl else None
         if port:
             self._e("portfolio", **port)
         result = {"verdicts": {search.hyps[i]["id"]: verdicts[i].to_dict() for i in order},

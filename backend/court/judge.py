@@ -27,6 +27,7 @@ CAUSE_OF_DEATH = {
     "fragility": "Died of parameter fragility",
     "simpson": "Died to Simpson's paradox",
     "peeking": "Died of peeking",
+    "placebo": "Died to the placebo (a random side earns the same)",
 }
 
 

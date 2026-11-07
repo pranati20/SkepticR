@@ -107,7 +107,7 @@ def regime(search, k, cfg: AttackConfig):
     srs = {y: _sr(x) for y, x in groups.items()}
     ev["period_sharpes"] = srs
     # volatility regimes from the market factor
-    if search.factors is not None and search.factors.shape[0] == T:
+    if search.factors is not None and search.factors.shape[0] == T and search.factors.shape[1] > 0 and np.ptp(search.factors[:, 0]) > 0:
         mv = np.abs(search.factors[:, 0])
         thr = np.median(mv)
         ev["high_vol_sharpe"] = _sr(pnl[mv > thr])
@@ -180,7 +180,12 @@ ATTACKS = {"leakage": leakage, "survivorship": survivorship, "costs": costs, "re
 def prosecute(search, k, cfg: AttackConfig | None = None, only: list | None = None, llm_review=None) -> list[dict]:
     cfg = cfg or AttackConfig()
     out = []
-    for name, fn in ATTACKS.items():
+    fns = dict(ATTACKS)
+    if getattr(search, "attack_fns", None) is not None:
+        fns = {f.__name__: f for f in search.attack_fns}
+    for f in (getattr(search, "extra_attack_fns", None) or []):
+        fns[f.__name__] = f
+    for name, fn in fns.items():
         if only and name not in only:
             continue
         try:

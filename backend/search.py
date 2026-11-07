@@ -19,28 +19,42 @@ from .features_dsl import parse, DSLError
 @dataclass
 class Search:
     hyps: list                       # [{id, family, description, prior, agent, spec:{...}}]
-    pnl: np.ndarray                  # (K,T) search window
-    pnl_hold: np.ndarray             # (K,H) never touched by search
-    factors: np.ndarray              # (T,f)
-    factors_hold: np.ndarray
+    pnl: np.ndarray | None           # (K,T) search window (None for tabular domains)
+    pnl_hold: np.ndarray | None      # (K,H) never touched by search
+    factors: np.ndarray | None       # (T,f)
+    factors_hold: np.ndarray | None
     factor_names: list
-    turnover: np.ndarray             # (K,) mean daily one-way turnover
+    turnover: np.ndarray | None      # (K,) mean daily one-way turnover
     dates: object = None             # DatetimeIndex for the search window (regime/year splits)
     truth: np.ndarray | None = None  # per-hypothesis ground truth label if known: 'alpha','beta','trap','null'
     rerun: Callable | None = None    # rerun(k, universe=None, formula=None, extra_lag=0) -> pnl (T,)
     feature_fn: Callable | None = None   # feature_fn(k) -> (T,N) causal feature, for IC diagnostics
     realized_ret: np.ndarray | None = None
     alpha_adj_p: np.ndarray | None = None   # search-adjusted p of the factor-adjusted ALPHA t (filled by the Court)
+    # ---- domain hooks (tabular / betting / A-B / health / upload). All optional; defaults are the pnl pipeline.
+    observed: np.ndarray | None = None      # (K,) signed statistics when not derivable from pnl
+    n_obs: int | None = None                # observations behind the statistics (power calc)
+    null_fn: Callable | None = None         # null_fn(cum_idx, n_worlds, seed) -> NullResult over hypotheses cum_idx
+    attack_fns: list | None = None          # replaces the default attack list: [fn(search,k,cfg)->result]
+    extra_attack_fns: list | None = None    # appended to the default list
+    oos_fn: Callable | None = None          # oos_fn(k) -> {n_days, oos_sharpe, t, p_one_sided, confirmed}
+    unit: str = "days"                      # unit of "more data needed"
     domain: str = "market"
     meta: dict = field(default_factory=dict)
 
     @property
     def K(self):
-        return self.pnl.shape[0]
+        return len(self.hyps)
 
     @property
     def T(self):
-        return self.pnl.shape[1]
+        return self.n_obs if self.n_obs is not None else self.pnl.shape[1]
+
+    def obs(self) -> np.ndarray:
+        if self.observed is not None:
+            return self.observed
+        from .court import stats as _S
+        return _S.tstat(self.pnl)
 
     def is_true(self) -> np.ndarray | None:
         return None if self.truth is None else self.truth == "alpha"

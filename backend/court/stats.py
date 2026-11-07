@@ -20,7 +20,7 @@ def sharpe(pnl: np.ndarray) -> np.ndarray:
 
 def tstat(pnl: np.ndarray) -> np.ndarray:
     T = pnl.shape[1]
-    return sharpe(pnl) / np.sqrt(ANN) * np.sqrt(T)
+    return np.nan_to_num(sharpe(pnl) / np.sqrt(ANN) * np.sqrt(T), nan=0.0)      # zero-variance series carry no evidence
 
 
 def pvalues_two_sided(pnl: np.ndarray) -> np.ndarray:
