@@ -39,7 +39,15 @@ def raw_t(pnl: np.ndarray, factors: np.ndarray | None = None) -> np.ndarray:
 def alpha_t(pnl: np.ndarray, factors: np.ndarray) -> np.ndarray:
     """t-stat of the intercept in pnl_k = a + B f + e (alpha vs known factors), all signals at once."""
     K, T = pnl.shape
-    X = np.column_stack([np.ones(T), factors])
+    factors = np.asarray(factors, float).reshape(T, -1)
+    keep = [j for j in range(factors.shape[1]) if np.ptp(factors[:, j]) > 1e-12]       # constant column == intercept
+    X = np.column_stack([np.ones(T), factors[:, keep]])
+    if T <= X.shape[1]:                                 # not enough rows to fit: no evidence, don't crash the run
+        return np.zeros(K)
+    if X.shape[1] > 1:                                  # drop columns that add no rank (duplicates / linear combinations)
+        q, r = np.linalg.qr(X)
+        good = np.abs(np.diag(r)) > 1e-10 * max(1.0, np.abs(r).max())
+        X = X[:, good] if good[0] else X
     p = X.shape[1]
     if T <= p:                                        # not enough rows to fit: no evidence, don't crash the run
         return np.zeros(K)

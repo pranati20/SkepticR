@@ -42,7 +42,7 @@ class AlphaInvesting:
 
     def update(self, level: float, rejected: bool, label: str = "") -> float:
         if rejected:
-            self.wealth += self.payout
+            self.wealth += min(self.payout, level)          # Foster-Stine: reward omega <= the level alpha_j just spent
         else:
             self.wealth -= level / (1.0 - level)
         self.wealth = max(self.wealth, 0.0)

@@ -64,6 +64,9 @@ def confession(search_size: int, cleaning_choices: int, p_luck_rate: float) -> s
             f"Luck alone would produce something this good {pct_s} of the time.")
 
 
+CONF_CAP = 0.99
+
+
 def storey_pi0(p: np.ndarray, lam: float = 0.5) -> float:
     return float(min(1.0, (p > lam).mean() / (1 - lam)))
 
@@ -86,7 +89,7 @@ def confidence_scores(p_unadj_emp: np.ndarray) -> np.ndarray:
     set of findings at least this extreme, so the score tends to be optimistic (see the calibration
     table in the README benchmark: stated 0.88 vs actual 0.79). Use it for ranking, not as a probability."""
     pi0 = storey_pi0(p_unadj_emp)
-    return 1.0 - qvalues(p_unadj_emp, pi0)
+    return np.minimum(1.0 - qvalues(p_unadj_emp, pi0), CONF_CAP)           # never display certainty
 
 
 def judge_one(hyp_id: str, null, k: int, level: float, attacks: list[dict] | None, search: dict,

@@ -39,7 +39,8 @@ export default function ReplicationView({ s, run, demo, running }: { s: RunState
           </Card>
           <Card title="2 · Librarian: does the paper apply to this scenario?">
             {lit ? (<div className="space-y-2">
-              {lit.papers.map((p: any, i: number) => (<div key={i} className="text-sm">📄 <b>{p.authors}</b> ({p.year}) <span className="text-slate-300">{p.title}</span><div className="text-[11px] text-mute">sample {p.sample?.join('–')} · {p.universe} · applicability {p.applicability}</div></div>))}
+              <div className="text-[11px] text-mute">{lit.live ? 'Live search' : 'Offline'}{lit.search_status?.length ? ' · ' + lit.search_status.join(' · ') : ''} · these papers are passed to the Prosecutors' literature attack</div>
+              {lit.papers.map((p: any, i: number) => (<div key={i} className="text-sm">📄 <b>{p.authors}</b> ({p.year}) {p.url ? <a href={p.url} target="_blank" rel="noreferrer" className="text-sky-300 underline">{p.title}</a> : <span className="text-slate-300">{p.title}</span>}<div className="text-[11px] text-mute">{p.source}{p.sample ? ` · sample ${p.sample.join('–')}` : ''}{p.universe ? ` · ${p.universe}` : ''}{p.applicability != null ? ` · applicability ${p.applicability}` : ''}</div></div>))}
               {lit.caveats?.map((c: string, i: number) => <div key={i} className="text-[12px] text-amber-300/90">• {c}</div>)}
             </div>) : <div className="text-sm text-mute">…</div>}
           </Card>

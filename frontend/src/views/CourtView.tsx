@@ -159,13 +159,13 @@ export function Detail({ s, id }: { s: RunState; id: string }) {
       {lit && lit.evidence.papers?.length > 0 && (
         <div>
           <div className="h-label mb-1">Librarian: papers checked against this scenario</div>
-          {lit.evidence.papers.map((p: any, i: number) => (<div key={i} className="text-xs text-slate-300">📄 {p.authors} ({p.year}) — {p.title} <span className="text-mute">· applicability {p.applicability ?? '–'}</span></div>))}
+          {lit.evidence.papers.map((p: any, i: number) => (<div key={i} className="text-xs text-slate-300">📄 {p.authors} ({p.year}) — {p.url ? <a href={p.url} target="_blank" rel="noreferrer" className="text-sky-300 underline">{p.title}</a> : p.title} <span className="text-mute">{p.source ? `${p.source} · ` : ''}· applicability {p.applicability ?? '–'}</span></div>))}
           {lit.evidence.caveats?.map((c: string, i: number) => <div key={i} className="mt-1 text-[11px] text-amber-300/90">• {c}</div>)}
         </div>
       )}
       {pr && (
         <Banner tone="sky">
-          Pre-registered <code>{pr.hash.slice(0, 16)}…</code> before touching the held-out slice. Out-of-sample: {pr.oos.n_days} obs, score {fmt(pr.oos.oos_sharpe, 2)}, p={fmt(pr.oos.p_one_sided, 3)} → <b>{pr.oos.confirmed ? 'CONFIRMED' : 'NOT confirmed'}</b>
+          Holdout commitment (spec frozen before the holdout was scored) <code>{pr.hash.slice(0, 16)}…</code> before touching the held-out slice. Out-of-sample: {pr.oos.n_days} obs, score {fmt(pr.oos.oos_sharpe, 2)}, p={fmt(pr.oos.p_one_sided, 3)} → <b>{pr.oos.confirmed ? 'CONFIRMED' : 'NOT confirmed'}</b>
         </Banner>
       )}
       {card && (
@@ -231,7 +231,7 @@ export default function CourtView({ s, compact = false }: { s: RunState; compact
               <motion.button key={v.hypothesis_id} initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} onClick={() => setSel(v.hypothesis_id)} className="block w-full rounded-lg border border-disc/30 bg-disc/5 p-2 text-left hover:border-disc">
                 <div className="flex items-center gap-2"><Pill verdict="DISCOVERY" /><span className="truncate text-sm">{v.description}</span></div>
                 <div className="mt-1 text-[11px] italic text-slate-400">“{v.confession}”</div>
-                {s.prereg[v.hypothesis_id] && <div className="mt-1 text-[11px] text-sky-300">pre-registered {s.prereg[v.hypothesis_id].hash.slice(0, 10)}… → out-of-sample {s.prereg[v.hypothesis_id].oos.confirmed ? 'confirmed ✓' : 'not confirmed ✗'}</div>}
+                {s.prereg[v.hypothesis_id] && <div className="mt-1 text-[11px] text-sky-300">holdout-committed {s.prereg[v.hypothesis_id].hash.slice(0, 10)}… → out-of-sample {s.prereg[v.hypothesis_id].oos.confirmed ? 'confirmed ✓' : 'not confirmed ✗'}</div>}
               </motion.button>))}
             {maybe.slice(0, 3).map((v: any) => (
               <button key={v.hypothesis_id} onClick={() => setSel(v.hypothesis_id)} className="block w-full rounded-lg border border-maybe/30 bg-maybe/5 p-2 text-left hover:border-maybe">

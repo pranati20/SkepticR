@@ -4,7 +4,9 @@ feeds that evidence to the Prosecutors.
 Sources
   * a bundled index of well-known papers (works offline; deterministic). Entries carry only facts I am confident of:
     authors, year, venue, the claim, sample period/universe. Verify before citing: this is an index, not a literature review.
-  * optional live search of Crossref (title/authors/year/DOI), cached on disk. If the network is down it silently falls back.
+  * LIVE search (default on; SKEPTIC_OFFLINE=1 disables): Crossref + arXiv (+ OpenAlex if OPENALEX_API_KEY is set). Every live
+    paper is a real API result with a DOI/arXiv link; nothing is generated. A source that is down contributes nothing and is
+    reported; the curated index is then the only fallback and is labelled 'curated index, verify'.
 LLM role 'librarian' (cheap model) is only used to summarise relevance when a real provider is configured.
 
 Applicability checks (zero tokens) compare a paper with the CURRENT scenario: sample overlap (is our data out-of-sample?),
@@ -15,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import urllib.parse
 import urllib.request
@@ -126,52 +129,180 @@ def assess(entry: dict, sc: Scenario) -> dict:
     return {"applicability": round(applicability, 2), "expected_haircut": haircut, "caveats": cav}
 
 
-def crossref(query: str, rows: int = 3, timeout: float = 6.0) -> list[dict]:
-    """Live search (title/authors/year/DOI only). Cached. Returns [] when offline."""
-    key = hashlib.sha1(query.encode()).hexdigest()[:16]
-    f = CACHE / f"{key}.json"
+_STOP = set("the a an of and or to in on for with by from that this these those is are was were be been it its as at stocks stock "
+            "tend returns return next past over their than more less which when what who how not no can will would should".split())
+FAMILY_QUERY = {"momentum": "momentum stock returns winners losers", "mean_reversion": "short-term reversal stock returns",
+                "volatility": "low volatility anomaly stock returns", "fundamentals": "value book-to-market stock returns",
+                "volume_sentiment": "trading volume stock returns predictability", "subgroup": "peeking A/B testing false positives"}
+_FIN = ("stock", "equit", "return", "asset pric", "portfolio", "trading", "investor", "anomal", "factor", "securities", "market",
+        "a/b", "experiment", "multiple testing", "backtest", "sharpe", "volatil", "momentum", "reversal")
+UA = "skeptic-research-demo/1.0 (academic literature check)"
+
+
+def _terms(q: str) -> list[str]:
+    out = []
+    for w in re.findall(r"[a-z][a-z\-]{2,}", q.lower()):
+        if w not in _STOP and w not in out:
+            out.append(w)
+    return out
+
+
+def _get(url: str, timeout: float) -> bytes:
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read()
+
+
+def _cached(kind: str, query: str, fn):
+    """Disk cache of REAL API responses only (a failed call is never cached)."""
+    key = hashlib.sha1(f"{kind}|{query}".encode()).hexdigest()[:16]
+    f = CACHE / f"{kind}_{key}.json"
     if f.exists():
         return json.loads(f.read_text(encoding="utf-8"))
-    try:
-        url = "https://api.crossref.org/works?" + urllib.parse.urlencode({"query": query, "rows": rows, "select": "title,author,issued,DOI,container-title",
-                                                                           "filter": "type:journal-article"})
-        req = urllib.request.Request(url, headers={"User-Agent": "skeptic-research-demo/1.0"})
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            items = json.loads(r.read().decode())["message"]["items"]
-    except Exception:
-        return []
-    out = []
-    for it in items:
-        yr = (it.get("issued", {}).get("date-parts") or [[None]])[0][0]
-        au = ", ".join(a.get("family", "") for a in it.get("author", [])[:3])
-        out.append({"title": (it.get("title") or [""])[0], "authors": au, "year": yr, "doi": it.get("DOI"),
-                    "venue": (it.get("container-title") or [""])[0], "source": "crossref (live)"})
+    out = fn()
     CACHE.mkdir(exist_ok=True)
     f.write_text(json.dumps(out), encoding="utf-8")
     return out
 
 
+def crossref(query: str, rows: int = 5, timeout: float = 8.0) -> list[dict]:
+    """Live Crossref search. Every field comes from the API response; raises on network failure."""
+    def fetch():
+        url = "https://api.crossref.org/works?" + urllib.parse.urlencode(
+            {"query.bibliographic": query, "rows": rows, "select": "title,author,issued,DOI,container-title,abstract,URL",
+             "filter": "type:journal-article"})
+        items = json.loads(_get(url, timeout).decode())["message"]["items"]
+        out = []
+        for it in items:
+            yr = (it.get("issued", {}).get("date-parts") or [[None]])[0][0]
+            au = ", ".join(a.get("family", "") for a in it.get("author", [])[:3]) + (" et al." if len(it.get("author", [])) > 3 else "")
+            out.append({"title": (it.get("title") or [""])[0], "authors": au, "year": yr, "doi": it.get("DOI"),
+                        "url": f"https://doi.org/{it['DOI']}" if it.get("DOI") else it.get("URL"),
+                        "venue": (it.get("container-title") or [""])[0],
+                        "abstract": re.sub(r"<[^>]+>", " ", it.get("abstract", "") or "").strip()[:600], "source": "Crossref (live)"})
+        return out
+    return _cached("crossref", f"{query}|{rows}", fetch)
+
+
+def arxiv(query: str, rows: int = 5, timeout: float = 8.0) -> list[dict]:
+    """Live arXiv search restricted to quantitative finance + statistics. Raises on network failure."""
+    def fetch():
+        import xml.etree.ElementTree as ET
+        terms = " AND ".join(f"all:{t}" for t in _terms(query)[:6])
+        url = "http://export.arxiv.org/api/query?" + urllib.parse.urlencode(
+            {"search_query": f"({terms}) AND (cat:q-fin.* OR cat:stat.*)", "max_results": rows, "sortBy": "relevance"})
+        ns = {"a": "http://www.w3.org/2005/Atom"}
+        root = ET.fromstring(_get(url, timeout))
+        out = []
+        for e in root.findall("a:entry", ns):
+            g = lambda tag: (e.findtext(f"a:{tag}", default="", namespaces=ns) or "").strip()
+            names = [n.findtext("a:name", default="", namespaces=ns) for n in e.findall("a:author", ns)]
+            au = ", ".join(n.split()[-1] for n in names[:3]) + (" et al." if len(names) > 3 else "")
+            out.append({"title": re.sub(r"\s+", " ", g("title")), "authors": au, "year": int(g("published")[:4] or 0) or None, "doi": None,
+                        "url": g("id"), "venue": "arXiv preprint (not peer reviewed)", "abstract": re.sub(r"\s+", " ", g("summary"))[:600],
+                        "source": "arXiv (live)"})
+        return out
+    return _cached("arxiv", f"{query}|{rows}", fetch)
+
+
+def openalex(query: str, rows: int = 5, timeout: float = 8.0) -> list[dict]:
+    """Live OpenAlex search. Needs OPENALEX_API_KEY (free) for more than the tiny shared daily budget; skipped otherwise."""
+    key = os.environ.get("OPENALEX_API_KEY")
+    if not key:
+        raise RuntimeError("OPENALEX_API_KEY not set (optional)")
+
+    def fetch():
+        url = "https://api.openalex.org/works?" + urllib.parse.urlencode(
+            {"search": query, "per-page": rows, "api_key": key, "select": "title,authorships,publication_year,doi,primary_location"})
+        out = []
+        for it in json.loads(_get(url, timeout).decode())["results"]:
+            names = [a["author"]["display_name"] for a in it.get("authorships", [])]
+            au = ", ".join(n.split()[-1] for n in names[:3]) + (" et al." if len(names) > 3 else "")
+            out.append({"title": it.get("title") or "", "authors": au, "year": it.get("publication_year"), "doi": it.get("doi"),
+                        "url": it.get("doi"), "venue": ((it.get("primary_location") or {}).get("source") or {}).get("display_name") or "",
+                        "abstract": "", "source": "OpenAlex (live)"})
+        return out
+    return _cached("openalex", f"{query}|{rows}", fetch)
+
+
+def live_search(query: str, rows: int = 5) -> tuple[list[dict], list[str]]:
+    """Query all live sources in parallel. Returns (papers, per-source status notes). Never fabricates: a source that
+    fails contributes nothing and is reported in the notes."""
+    from concurrent.futures import ThreadPoolExecutor
+    srcs = {"Crossref": crossref, "arXiv": arxiv, "OpenAlex": openalex}
+    papers, notes = [], []
+    with ThreadPoolExecutor(3) as ex:
+        futs = {n: ex.submit(fn, query, rows) for n, fn in srcs.items()}
+    for n, f in futs.items():
+        try:
+            res = f.result()
+            papers += res
+            notes.append(f"{n}: {len(res)} results")
+        except Exception as e:  # noqa: BLE001  (one source failing must not stop the others)
+            notes.append(f"{n}: unavailable ({type(e).__name__})")
+    seen, uniq = set(), []
+    for p in papers:
+        k = re.sub(r"\W+", "", p["title"].lower())[:60]
+        if p["title"] and k not in seen:
+            seen.add(k)
+            uniq.append(p)
+    return uniq, notes
+
+
+def _live_relevance(p: dict, terms: list[str]) -> float:
+    title, abst = p["title"].lower(), (p.get("abstract") or "").lower()
+    return sum(2.0 for t in terms if t in title) + sum(1.0 for t in terms if t in abst and t not in title)
+
+
+def assess_live(p: dict, sc: Scenario) -> dict:
+    """Applicability of a LIVE paper from what the API actually tells us (publication year). Its sample period is NOT known."""
+    cav = ["Sample period and universe not verified: read the paper (" + (p.get("url") or "no link") + ")."]
+    haircut = 0.0
+    if p.get("source", "").startswith("arXiv"):
+        cav.append("Preprint, not peer reviewed.")
+    yr = p.get("year")
+    if yr:
+        if sc.start_year > yr:
+            cav.append(f"All of your data ({sc.start_year}-{sc.end_year}) is after this paper appeared ({yr}): expect post-publication decay "
+                       "(McLean & Pontiff 2016: about 58% lower anomaly returns).")
+            haircut = 0.58
+        elif sc.start_year < yr < sc.end_year:
+            cav.append(f"Published in {yr}, inside your sample: compare before vs after.")
+            haircut = 0.30
+    return {"applicability": None, "expected_haircut": haircut, "caveats": cav}
+
+
 @dataclass
 class Librarian:
     scenario: Scenario
-    online: bool = False
+    online: bool = field(default_factory=lambda: os.environ.get("SKEPTIC_OFFLINE") != "1")
     cache: dict = field(default_factory=dict)
+    status: list = field(default_factory=list)       # per-source live-search notes, surfaced in the UI
 
     def find(self, text: str, family: str | None = None, top: int = 3) -> list[dict]:
         key = (text, family)
         if key in self.cache:
             return self.cache[key]
-        ranked = sorted(((_score(text, e, family), e) for e in CORPUS), key=lambda x: -x[0])
         found = []
+        if self.online:
+            query = FAMILY_QUERY.get(family or "", "") or " ".join(_terms(text)[:8])
+            if not any(f in query.lower() for f in _FIN):
+                query += " stock returns"                      # anchor to finance so common words ("rebound", "fell") don't match medicine
+            terms = _terms(query)
+            live, notes = live_search(query, 6)
+            self.status = notes
+            on_topic = [p for p in live if any(f in (p["title"] + " " + (p.get("abstract") or "")).lower() for f in _FIN)]
+            ranked = sorted(((_live_relevance(p, terms), p) for p in on_topic), key=lambda x: -x[0])
+            for rel, p in [x for x in ranked if x[0] >= 2][:top]:
+                found.append({**p, "id": p.get("doi") or p["url"], "claim": (p.get("abstract") or "")[:240] or "(no abstract returned: open the link)",
+                              "sample": None, "universe": None, "relevance": round(rel, 1), **assess_live(p, self.scenario)})
+        ranked = sorted(((_score(text, e, family), e) for e in CORPUS), key=lambda x: -x[0])
         for sc_, e in ranked[:top]:
             if sc_ <= 0:
                 continue
             found.append({**{k: e[k] for k in ("id", "authors", "year", "title", "venue", "claim", "sample", "universe")},
-                          "relevance": round(sc_, 1), "source": "bundled index", **assess(e, self.scenario)})
-        if self.online and found:
-            q = f"{found[0]['title']} {text}"[:160]
-            for p in crossref(q, 2):
-                found.append({**p, "claim": "(live result: read the abstract)", "relevance": 0.0, "applicability": None, "caveats": [], "expected_haircut": 0.0})
+                          "relevance": round(sc_, 1), "source": "curated index (not live: verify before citing)", "url": None,
+                          **assess(e, self.scenario)})
         self.cache[key] = found
         return found
 
@@ -205,6 +336,6 @@ def literature_attack_factory(evidence: dict[str, dict]):
             notes.append(f"Observed Sharpe {sr:.1f} is far above what the literature makes plausible for this idea today (~{plausible_max:.1f}). "
                          "Too good to be true: look for leakage or a data artefact.")
         return {"attack": "literature", "severity": "medium", "survived": ok, "evidence": {
-            "observed_sharpe": sr, "papers": [{k2: p[k2] for k2 in ("authors", "year", "title", "applicability") if k2 in p} for p in ev.get("papers", [])[:3]],
+            "observed_sharpe": sr, "papers": [{k2: p[k2] for k2 in ("authors", "year", "title", "applicability", "url", "source") if k2 in p} for p in ev.get("papers", [])[:3]],
             "expected_post_publication_haircut": hc, "caveats": ev.get("caveats", []), "notes": notes}}
     return literature

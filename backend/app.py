@@ -25,9 +25,12 @@ DEMO = ROOT / "demo"
 DIST = ROOT / "frontend" / "dist"
 
 app = FastAPI(title="Skeptic", description="Continuous integration for claims.")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:8000", "http://127.0.0.1:8000", "http://localhost:5173", "http://127.0.0.1:5173"], allow_methods=["*"], allow_headers=["*"])
 
 RUNS: dict[str, dict] = {}
+MAX_RUNS = 40                     # oldest runs are evicted
+MAX_WORLDS = 1000                 # clamp on caller-supplied null-world counts (CPU protection)
+MAX_CSV_CHARS = 20_000_000
 
 
 def _clean(o):
@@ -63,15 +66,23 @@ def start_run(body: dict):
     rid = uuid.uuid4().hex[:10]
     st = {"events": [], "done": False, "scenario": name}
     RUNS[rid] = st
+    while len(RUNS) > MAX_RUNS:
+        RUNS.pop(next(iter(RUNS)), None)
 
     def emit(ev):
         st["events"].append(_clean(ev))
 
     def work():
         try:
-            run_scenario(name, body.get("params") or {}, emit, int(body.get("seed", 0)))
-        except Exception:
-            pass
+            params = body.get("params") or {}
+            if not isinstance(params, dict):
+                raise ValueError("params must be an object")
+            params = dict(params)
+            if "n_worlds" in params:
+                params["n_worlds"] = int(max(50, min(MAX_WORLDS, int(params["n_worlds"]))))
+            run_scenario(name, params, emit, int(body.get("seed", 0)))
+        except Exception as e:  # surfaced to the UI instead of a silent empty run
+            emit({"type": "error", "message": f"{type(e).__name__}: {e}"})
         finally:
             st["done"] = True
 
@@ -133,7 +144,17 @@ def demo_run(name: str):
 @app.post("/api/upload")
 def upload(body: dict):
     """Profile an uploaded CSV (sent as text) and suggest a mapping. Nothing is stored."""
-    df = pd.read_csv(io.StringIO(body["csv"]))
+    csv = body.get("csv") if isinstance(body, dict) else None
+    if not isinstance(csv, str) or not csv.strip():
+        raise HTTPException(400, "body must be {\"csv\": \"<csv text>\"}")
+    if len(csv) > MAX_CSV_CHARS:
+        raise HTTPException(413, "file too large for the demo")
+    try:
+        df = pd.read_csv(io.StringIO(csv))
+    except Exception as e:
+        raise HTTPException(400, f"could not parse CSV: {e}")
+    if len(df) == 0 or df.shape[1] == 0:
+        raise HTTPException(400, "CSV has no data rows")
     if len(df) > 200_000:
         raise HTTPException(413, "file too large for the demo (200k rows max)")
     cols = []
@@ -160,12 +181,18 @@ def null_rerun(body: dict):
     import numpy as np
     from .adapters.synthetic import SynthConfig, generate
     from .court import null_worlds as NW, stats as S
-    n = int(max(50, min(2000, body.get("n_worlds", 300))))
-    if "data" not in _NULLLAB:
-        _NULLLAB["data"] = generate(SynthConfig(seed=int(body.get("seed", 0))))
-    d = _NULLLAB["data"]
+    try:
+        n = int(max(50, min(MAX_WORLDS, body.get("n_worlds", 300))))
+        seed = int(body.get("seed", 0))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "n_worlds and seed must be numbers")
+    if seed not in _NULLLAB:
+        if len(_NULLLAB) >= 8:
+            _NULLLAB.pop(next(iter(_NULLLAB)))
+        _NULLLAB[seed] = generate(SynthConfig(seed=seed))
+    d = _NULLLAB[seed]
     t0 = time.time()
-    r = NW.run_null_worlds(d.pnl, d.factors, S.raw_t, "stationary_bootstrap", n, seed=7)
+    r = NW.run_null_worlds(d.pnl, d.factors, S.raw_t, "stationary_bootstrap", n, seed=seed + 7)
     obs = np.abs(r.observed)
     planted = [i for i in range(len(d.meta)) if d.meta[i]["kind"] == "planted"]
     hi = float(max(r.null_max.max(), obs[planted].max())) * 1.05
@@ -193,5 +220,10 @@ if DIST.exists():
 
     @app.get("/{path:path}")
     def spa(path: str):
-        f = DIST / path
-        return FileResponse(f if f.is_file() else DIST / "index.html")
+        root = DIST.resolve()
+        try:
+            f = (root / path).resolve()
+            inside = f.is_file() and (f == root or root in f.parents)
+        except (OSError, ValueError):
+            inside = False
+        return FileResponse(f if inside else root / "index.html")

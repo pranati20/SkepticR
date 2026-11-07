@@ -66,7 +66,12 @@ export function useRun(dispatch: (a: any) => void) {
       const proto = location.protocol === 'https:' ? 'wss' : 'ws'
       const ws = new WebSocket(`${proto}://${location.host}/ws/${run_id}`)
       wsRef.current = ws
-      ws.onmessage = (m) => { if (my === gen.current) { queue.current.push(JSON.parse(m.data)); pump() } }
+      let sawDone = false
+      ws.onmessage = (m) => { if (my === gen.current) { const ev = JSON.parse(m.data); if (ev.type === 'done') sawDone = true; queue.current.push(ev); pump() } }
+      ws.onclose = () => {
+        // a socket that closes without a `done` event must not leave the UI spinning forever
+        if (my === gen.current && !sawDone) { queue.current.push({ type: 'error', message: 'Connection to the backend closed before the run finished.' }, { type: 'done' }); pump() }
+      }
       ws.onerror = () => dispatch({ type: 'error', message: 'WebSocket error: is the backend running? (uvicorn skeptic.backend.app:app)' })
     } catch (e: any) { dispatch({ type: 'error', message: String(e.message || e) }); setRunning(false) }
   }, [reset, pump, dispatch])

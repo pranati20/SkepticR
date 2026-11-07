@@ -49,6 +49,7 @@ python -m pytest skeptic/tests -q            # statistics incl. known-answer tes
 ```
 Rebuild the UI: `cd skeptic/frontend && npm install && npm run build` (dev server: `npm run dev`, proxies to :8000).
 Re-record demo runs: `python -m skeptic.demo --record`. Re-run the benchmark: `python -m skeptic.backend.benchmark.run_benchmark --seeds 20`.
+Librarian (paper search) is **live by default**: Crossref + arXiv, plus OpenAlex if `OPENALEX_API_KEY` is set; every paper shown is a real API result with a DOI/arXiv link, and the curated index is a labelled fallback. Set `SKEPTIC_OFFLINE=1` to disable network use.
 Real Claude instead of the mock: `SKEPTIC_USE_LLM=1 ANTHROPIC_API_KEY=...` (cheap model for Hunters/Cleaner, stronger for Prosecutor/Judge/report; every call cached on disk by prompt hash; live token + cost meter). Live paper search additionally uses Crossref when online (cached).
 
 ## Architecture

@@ -10,3 +10,4 @@ anthropic
 matplotlib
 jsonschema
 yfinance
+httpx

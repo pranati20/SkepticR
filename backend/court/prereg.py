@@ -1,6 +1,8 @@
-"""Pre-registration: SHA-256 hash of the full spec + predicted direction + timestamp, then out-of-sample scoring.
+"""Holdout commitment: SHA-256 hash of the full spec + predicted direction + timestamp, then out-of-sample scoring.
 
-The held-out slice must never have been touched during search; the hash proves the claim was fixed first.
+The held-out slice is never touched during search. The hash proves the spec was frozen BEFORE the holdout was scored.
+It does NOT prove the spec was chosen before the search (it is registered after the verdicts), so this is a holdout
+commitment, not a classical pre-registration. Anyone can recompute the hash from the published spec, direction and `ts`.
 """
 from __future__ import annotations
 

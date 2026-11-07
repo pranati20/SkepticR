@@ -9,6 +9,7 @@ credibility, ledger, tokens, prereg, strategy_card, portfolio, truth_check, repl
 from __future__ import annotations
 
 import io
+import os
 import time
 from typing import Callable
 
@@ -58,7 +59,7 @@ class Ctx:
         self.ledger = Ledger()
         self.run_id = self.ledger.start_run("run", {"seed": seed})
         self.seed = seed
-        self.online_literature = False
+        self.online_literature = os.environ.get("SKEPTIC_OFFLINE") != "1"   # live paper search by default
         self.llm.meter.listeners.append(lambda snap: self.emit("tokens", **snap))
 
     def emit(self, type_: str, **kw):
@@ -152,7 +153,7 @@ def _librarian(ctx: Ctx, search: Search):
     dates = search.dates
     sc = LIT.Scenario.from_meta(search.meta, dates, n_assets=int(search.meta.get("n_assets", 117 if search.meta.get("survivorship_bias") else 150)))
     lib = LIT.Librarian(sc, online=bool(ctx.online_literature))
-    ctx.emit("agent", agent="Librarian", text=f"Searching the literature and checking it against this scenario ({sc.start_year}-{sc.end_year}, {sc.universe})")
+    ctx.emit("agent", agent="Librarian", text=f"Searching the literature ({'LIVE: Crossref + arXiv' if lib.online else 'offline, curated index only'}) and checking it against this scenario ({sc.start_year}-{sc.end_year}, {sc.universe})")
     evid, per_family = {}, {}
     for h in search.hyps:
         evid[h["id"]] = lib.evidence(h)
@@ -161,7 +162,8 @@ def _librarian(ctx: Ctx, search: Search):
         top = [p for p in ev["papers"] if p.get("relevance", 0) > 0][:2]
         if top:
             ctx.emit("literature", family=fam, scenario={"start_year": sc.start_year, "end_year": sc.end_year, "universe": sc.universe, "survivor_universe": sc.survivor_universe},
-                     papers=top, has_direct_support=ev["has_direct_support"], expected_haircut=ev["expected_haircut"], caveats=ev["caveats"])
+                     papers=top, has_direct_support=ev["has_direct_support"], expected_haircut=ev["expected_haircut"], caveats=ev["caveats"],
+                     live=lib.online, search_status=list(lib.status))
     search.literature = evid
     search.extra_attack_fns = (search.extra_attack_fns or []) + [LIT.literature_attack_factory(evid)]
 
@@ -172,7 +174,7 @@ def _court(ctx: Ctx, search: Search, params: dict, truth: bool, log_tests: bool 
     for h in search.hyps:
         h.setdefault("round", -1)
     review_fn = review.make_llm_review(ctx.llm) if search.domain in ("market",) else None
-    if search.domain in ("market", "synthetic") and search.pnl is not None:
+    if search.domain in ("market", "synthetic") and search.pnl is not None and search.literature is None:
         _librarian(ctx, search)
     court = Court(ctx.ledger, ctx.llm.meter, review_fn, ctx.court_emit, cfg)
     res = court.run(search, ctx.run_id, log_tests=log_tests)
@@ -286,12 +288,14 @@ def run_replication(ctx: Ctx, params: dict) -> dict:
     panel = EQ.load_panel() if real else simulate_market_panel(ctx.seed, decay_after=900)
     holdout = 504 if real else 252
     lib = LIT.Librarian(LIT.Scenario.from_meta(panel.meta, panel.dates, n_assets=panel.shape[1]), online=bool(ctx.online_literature))
-    ctx.emit("agent", agent="Librarian", text="Finding the source paper and checking it against this scenario")
-    found = lib.find(text + " " + obj["name"], "mean_reversion" if "revers" in obj["name"].lower() else None)
-    ctx.emit("literature", family="replication", papers=[p for p in found if p.get("relevance", 0) > 0][:3], has_direct_support=bool(found),
+    ctx.emit("agent", agent="Librarian", text=("Searching Crossref and arXiv LIVE for the source paper" if lib.online else "Offline: curated index only") + " and checking it against this scenario")
+    found = lib.find(obj["name"] + " anomaly stock returns", None, top=4)
+    found = [p for p in found if p.get("relevance", 0) > 0][:6]
+    ctx.emit("literature", family="replication", papers=found, has_direct_support=any(p["relevance"] >= 4 for p in found),
+             live=lib.online, search_status=list(lib.status),
              scenario={"start_year": int(panel.dates[0].year), "end_year": int(panel.dates[-1].year), "universe": panel.meta.get("source"),
                        "survivor_universe": bool(panel.meta.get("survivorship_bias"))},
-             expected_haircut=max([p.get("expected_haircut", 0) for p in found], default=0.0), caveats=sorted({c for p in found[:2] for c in p.get("caveats", [])})[:4])
+             expected_haircut=max([p.get("expected_haircut", 0) for p in found], default=0.0), caveats=sorted({c for p in found[:3] for c in p.get("caveats", [])})[:5])
     pub = pd.Timestamp(params["pub_date"]) if params.get("pub_date") else (panel.dates[900] if not real else None)
     if not real:
         ctx.emit("agent", agent="Replicator", text=f"Stand-in world: the effect is arbitrage-limited and decays after {pub.date()}")
@@ -321,6 +325,12 @@ def run_replication(ctx: Ctx, params: dict) -> dict:
     _search_ledger_event(ctx)
     search = build_market_search(clean_panel, hyps, holdout=holdout)
     search.meta.update(panel.meta)
+    # hand the Librarian's papers to the Prosecutors (literature attack): same evidence for every replication variant
+    direct = [p for p in found if p["relevance"] >= 4]
+    rep_ev = {"papers": found, "has_direct_support": bool(direct), "caveats": sorted({c for p in found[:3] for c in p.get("caveats", [])})[:5],
+              "expected_haircut": max([p.get("expected_haircut", 0) for p in direct], default=0.0), "prior_suggestion": 0.8 if direct else 0.3}
+    search.literature = {h["id"]: rep_ev for h in hyps}
+    search.extra_attack_fns = (search.extra_attack_fns or []) + [LIT.literature_attack_factory(search.literature)]
     out = _court(ctx, search, {**params, "rounds": 1, "n_worlds": params.get("n_worlds", 300)}, truth=False)
     # decay analysis on the as-published construction
     pnl = np.concatenate([search.pnl[0], search.pnl_hold[0]])

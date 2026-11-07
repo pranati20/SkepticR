@@ -105,9 +105,12 @@ class Court:
                 if search.pnl is not None and search.domain in ("market", "synthetic") and search.null_fn is None:
                     if search.alpha_adj_p is None:
                         search.alpha_adj_p = np.full(K, np.nan)
-                    nullA = NW.run_null_worlds(search.pnl[cum], search.factors, S.alpha_t, cfg.method, cfg.n_worlds, seed=cfg.seed + 303 * (r + 1))
-                    self.meter.stat("null_world_search_runs", cfg.n_worlds * len(cum))
-                    search.alpha_adj_p[cum] = nullA.p_stepdown
+                    try:
+                        nullA = NW.run_null_worlds(search.pnl[cum], search.factors, S.alpha_t, cfg.method, cfg.n_worlds, seed=cfg.seed + 303 * (r + 1))
+                        self.meter.stat("null_world_search_runs", cfg.n_worlds * len(cum))
+                        search.alpha_adj_p[cum] = nullA.p_stepdown
+                    except Exception as e:  # noqa: BLE001  one bad factor set must not abort a run that already has verdicts
+                        self._e("agent", agent="Court", text=f"Factor-adjusted audit skipped ({type(e).__name__}: {e}); confounder attack falls back to raw evidence", round=r)
                 with ThreadPoolExecutor(max_workers=4) as ex:
                     futs = {k: ex.submit(prosecute, search, k, cfg.attack, None, self.llm_review) for k in to_pros}
                     for k, f in futs.items():
@@ -118,7 +121,7 @@ class Court:
             for i in batch:
                 i = int(i)
                 j = pos[i]
-                v = J.judge_one(search.hyps[i]["id"], null, j, level, attacks.get(i), es, float(conf[j]), search.T, cfg.p_luck)
+                v = J.judge_one(search.hyps[i]["id"], null, j, level, attacks.get(i), es, float(conf[j]), search.T, cfg.p_luck, alpha_crit=level)
                 if null.observed[j] < 0 and v.verdict == J.DISCOVERY:          # wrong sign is not a discovery of what was claimed
                     v.verdict, v.cause_of_death = J.LUCK, "Died of the wrong sign (sign-flipped variant is a separate idea)"
                 verdicts[i] = v
