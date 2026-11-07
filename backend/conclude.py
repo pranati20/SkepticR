@@ -17,6 +17,7 @@ from collections import Counter
 from .llm import LLM
 
 MAX_FINDINGS = 12
+NL = chr(10) * 2
 
 SYSTEM = ("You write the conclusion of a data analysis that has ALREADY been audited for luck, leakage and bias. You are given the user's QUESTION "
           "and a numbered list of VALID FINDINGS: the only results that survived every statistical check. "
@@ -116,10 +117,13 @@ def conclude(question: str, events: list[dict], llm: LLM | None = None) -> dict:
     fs = f["findings"]
     base = {"question": question, "findings": fs, "n_valid": f["n_valid_total"], "n_tested": f["n_tested"], "n_luck": f["n_luck"],
             "n_unclear": f["n_unclear"], "top_causes": f["top_causes"], "answer": plain_answer(question, f)}
+    def with_answer(r: dict) -> dict:
+        """Put the plain-English answer at the top of the write-up the UI already displays."""
+        body = r["text"] if r["text"].startswith("Short answer:") else base["answer"] + NL + r["text"]
+        return {**r, "text": body}
     if not fs:
         why = f"{f['n_luck']} looked like luck or bias and {f['n_unclear']} had too little data to judge"
-        return {**base, "status": "none", "llm": "none",
-                "text": f"No valid conclusion can be drawn. Skeptic examined {f['n_tested']} possible findings and none survived every check ({why}). "
+        return {**base, "status": "none", "llm": "none", "text": base["answer"] + NL + f"No valid conclusion can be drawn. Skeptic examined {f['n_tested']} possible findings and none survived every check ({why}). "
                         f"So the data, as it stands, does not support an answer to: \"{question}\". More data or a sharper question may help."}
     llm = llm or LLM()
     if llm.is_mock:
@@ -128,7 +132,7 @@ def conclude(question: str, events: list[dict], llm: LLM | None = None) -> dict:
             lines.append(f"- [{x['ref']}] {x['claim']}" + (f" ({x['direction']})" if x["direction"] else "") + f"; evidence {x['evidence'] * 100:.0f}%, passed {x['checks_passed']} attacks")
         lines += ["", f"{f['n_luck']} other candidate findings were judged luck or bias and {f['n_unclear']} lacked data; none of them are used here.",
                   "(No AI model is configured, so this is a plain summary, not a written analysis.)"]
-        return {**base, "status": "valid", "llm": "offline (no model)", "text": "\n".join(lines)}
+        return with_answer({**base, "status": "valid", "llm": "offline (no model)", "text": "\n".join(lines)})
     digest = "\n".join(f"[{x['ref']}] {x['claim']} | direction: {x['direction'] or 'n/a'} | evidence {x['evidence']:.2f} | adjusted p {x['p_adj']:.3g} | "
                        f"power {('%.2f' % x['power']) if x['power'] is not None else 'n/a'} | checks passed {x['checks_passed']}"
                        + (f" | caution flags: {', '.join(x['flags'])}" if x["flags"] else "") for x in fs)
@@ -136,7 +140,7 @@ def conclude(question: str, events: list[dict], llm: LLM | None = None) -> dict:
               f"{f['n_unclear']} lacked data: do not discuss them):\n{digest}")
     try:
         obj, _ = llm.complete_json("conclusion", SYSTEM, prompt, SCHEMA, max_tokens=900)
-        return {**base, "status": "valid", "llm": llm.provider.name, "text": _sanitize(str(obj.get("text", "")), len(fs))}
+        return with_answer({**base, "status": "valid", "llm": llm.provider.name, "text": _sanitize(str(obj.get("text", "")), len(fs))})
     except Exception as e:  # noqa: BLE001
         return {**base, "status": "valid", "llm": "error",
-                "text": f"The AI model could not be reached ({type(e).__name__}). The valid findings are listed below; I have not written an analysis."}
+                "text": base["answer"] + NL + f"The AI model could not be reached ({type(e).__name__}). The valid findings are listed below; I have not written an analysis."}
