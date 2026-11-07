@@ -23,7 +23,7 @@ SYSTEM = ("You write the conclusion of a data analysis that has ALREADY been aud
           "and a numbered list of VALID FINDINGS: the only results that survived every statistical check. "
           "Rules: answer the question using ONLY these findings and cite them as [F1], [F2]. Never mention, guess or imply any result that is not listed. "
           "Do not invent numbers, causes or links. Say whether the findings fully, partly or do not answer the question. "
-          "These are statistical findings, not proof of causation and not investment or medical advice; say so briefly. Be concise and plain. Begin with \"Short answer:\" and one plain-English sentence that answers the QUESTION directly. "
+          "These are statistical findings, not proof of causation and not investment or medical advice; say so briefly. Be concise and plain. Begin with \"Yes.\", \"No.\", \"It depends.\" or \"Can't say.\" answering the QUESTION directly, then \"Why:\" in plain English. "
           "Reply with JSON only: {\"text\": \"...\"}.")
 SCHEMA = {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}
 
@@ -72,38 +72,38 @@ def _words(seg: str) -> str:
 
 
 def plain_answer(question: str, f: dict) -> str:
-    """A short plain-English answer to the user's own question, built only from the valid findings (no model, fully checkable)."""
+    """A plain-English Yes / No / Can't say answer to the user's own question, with the reason, built only from the valid findings."""
     fs = f["findings"]
-    q = f'"{question}"' if question else "your question"
     if not fs:
-        return (f"Short answer: we cannot say. The data does not give a reliable answer to {q}. Everything we found either looked like luck or bias "
-                f"or had too little data. More data, or a more specific question, may help.")
+        return ("Can't say. The data does not give a reliable answer to this question. Everything we found either looked like luck or bias "
+                "or had too little data. More data, or a more specific question, may help.")
     treat = (f.get("data") or {}).get("treat")
-    by_outcome: dict = {}
-    for x in fs:
-        o, s = _segment(x["id"])
-        by_outcome.setdefault(o, []).append((s, x))
-    parts = []
-    for o, items in list(by_outcome.items())[:3]:
-        overall = [x for s, x in items if s in ("overall", "all predicted bets")]
-        segs = [s for s, _ in items if s not in ("overall", "all predicted bets")]
-        dirs = {x["direction"] for _, x in items if x["direction"]}
-        d = (" (" + ("higher" if dirs == {"treated group higher"} else "lower" if dirs == {"treated group lower"} else "in different directions") +
-             (f" for the {treat} group" if treat else "") + ")") if dirs else ""
-        s_txt = ""
-        if overall:
-            s_txt = f"a real effect on {o}{d} that holds overall"
-        if segs:
-            shown = ", ".join(_words(s) for s in segs[:4]) + (f" and {len(segs) - 4} more groups" if len(segs) > 4 else "")
-            s_txt += (" and " if s_txt else f"a real effect on {o}{d} ") + f"within: {shown}"
-        parts.append(s_txt)
-    more = f" ({len(by_outcome) - 3} more outcomes also held up)" if len(by_outcome) > 3 else ""
-    strongest = max(x["evidence"] for x in fs)
-    skip = f["n_luck"] + f["n_unclear"]
-    return (f"Short answer: yes, in part. Of {f['n_tested']} things tried to answer {q}, {len(fs) if f['n_valid_total'] <= len(fs) else f['n_valid_total']} held up after "
-            f"every check. The data supports " + "; and ".join(parts) + more + f". Strongest evidence is about {strongest * 100:.0f}% that it is not luck. "
-            f"The other {skip} things tried (including any headline that looked impressive at first) did not hold up, so we do not claim them. "
-            "This shows an association in this data, not proof of cause, and it is not advice.")
+    outs = sorted({_segment(x["id"])[0] for x in fs})
+    outcome = ", ".join(outs[:2]) if outs else "the outcome"
+    dirs = {x["direction"] for x in fs if x["direction"]}
+    segs = [s for s in (_segment(x["id"])[1] for x in fs) if s not in ("overall", "all predicted bets")]
+    overall = any(_segment(x["id"])[1] in ("overall", "all predicted bets") for x in fs)
+    who = treat or "the tested factor"
+    if dirs == {"treated group higher"}:
+        head = f"Yes. {who.capitalize()} goes with higher {outcome} in this data."
+    elif dirs == {"treated group lower"}:
+        head = f"No, the opposite. {who.capitalize()} goes with lower {outcome} in this data."
+    elif len(dirs) > 1:
+        head = f"It depends. {who.capitalize()} raises {outcome} for some groups and lowers it for others."
+    else:
+        head = "Yes, a real pattern was found."
+    shown = ", ".join(_words(s) for s in segs[:4]) + (f" and {len(segs) - 4} more groups" if len(segs) > 4 else "")
+    why = [f"Why: of {f['n_tested']} comparisons tried, {f['n_valid_total']} held up after every check (luck, bias and cost tests), "
+           f"with up to {max(x['evidence'] for x in fs) * 100:.0f}% confidence it is not chance."]
+    if segs:
+        why.append(("It holds overall and " if overall else "It holds ") + f"when comparing like with like, e.g. within: {shown}.")
+    causes = " ".join(f.get("top_causes") or []).lower()
+    if "simpson" in causes or "confound" in causes or "beta" in causes:
+        why.append("A simple raw comparison of the whole dataset was misleading (the groups being compared differ in other ways, such as age), "
+                   "so it was not used; only comparisons that account for that are counted.")
+    why.append(f"The other {f['n_luck'] + f['n_unclear']} comparisons did not hold up and are not claimed. "
+               "This shows an association in this data, not proof of cause, and it is not medical, financial or other advice.")
+    return head + " " + " ".join(why)
 
 
 def _sanitize(text: str, n: int) -> str:
@@ -119,7 +119,7 @@ def conclude(question: str, events: list[dict], llm: LLM | None = None) -> dict:
             "n_unclear": f["n_unclear"], "top_causes": f["top_causes"], "answer": plain_answer(question, f)}
     def with_answer(r: dict) -> dict:
         """Put the plain-English answer at the top of the write-up the UI already displays."""
-        body = r["text"] if r["text"].startswith("Short answer:") else base["answer"] + NL + r["text"]
+        body = r["text"] if r["text"].startswith(("Yes", "No", "It depends", "Can't say")) else base["answer"] + NL + r["text"]
         return {**r, "text": body}
     if not fs:
         why = f"{f['n_luck']} looked like luck or bias and {f['n_unclear']} had too little data to judge"

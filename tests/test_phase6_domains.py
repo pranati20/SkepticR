@@ -48,6 +48,6 @@ def test_conclusion_has_plain_english_answer():
     from skeptic.backend import conclude as C
     ev, _ = run_scenario("health", {"n_worlds": 150})
     r = C.conclude("Do supplement users have better health?", ev)
-    assert r["answer"].startswith("Short answer:") and "not proof of cause" in r["answer"]
+    assert r["answer"].startswith("Yes.") and "Why:" in r["answer"] and "not proof of cause" in r["answer"]
     none = C.plain_answer("q?", {"findings": [], "n_tested": 5, "n_luck": 5, "n_unclear": 0, "n_valid_total": 0})
-    assert "we cannot say" in none
+    assert none.startswith("Can't say")
