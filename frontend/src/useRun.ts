@@ -12,6 +12,7 @@ export function useRun(dispatch: (a: any) => void) {
   const [running, setRunning] = useState(false)
   const [speed, setSpeed] = useState(1)
   const [source, setSource] = useState<string>('')
+  const [last, setLast] = useState<{ run?: string; demo?: string } | null>(null)
   const queue = useRef<any[]>([])
   const timer = useRef<any>(null)
   const speedRef = useRef(1)
@@ -44,7 +45,7 @@ export function useRun(dispatch: (a: any) => void) {
   const reset = useCallback(() => { stop(); dispatch({ type: '__reset' }) }, [stop, dispatch])
 
   const demo = useCallback(async (scenario: string) => {
-    reset(); setRunning(true); setSource(`replay: ${scenario}`)
+    reset(); setRunning(true); setSource(`replay: ${scenario}`); setLast({ demo: scenario })
     const my = ++gen.current
     try {
       const r = await fetch(`/api/demo/${scenario}`)
@@ -56,12 +57,13 @@ export function useRun(dispatch: (a: any) => void) {
   }, [reset, pump, dispatch])
 
   const live = useCallback(async (scenario: string, params: any = {}, seed = 0) => {
-    reset(); setRunning(true); setSource(`live: ${scenario}`)
+    reset(); setRunning(true); setSource(`live: ${scenario}`); setLast(null)
     const my = ++gen.current
     try {
       const r = await fetch('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scenario, params, seed }) })
       if (!r.ok) throw new Error(await r.text())
       const { run_id } = await r.json()
+      setLast({ run: run_id })
       if (my !== gen.current) return
       const proto = location.protocol === 'https:' ? 'wss' : 'ws'
       const ws = new WebSocket(`${proto}://${location.host}/ws/${run_id}`)
@@ -77,5 +79,5 @@ export function useRun(dispatch: (a: any) => void) {
   }, [reset, pump, dispatch])
 
   useEffect(() => () => stop(), [stop])
-  return { running, speed, setSpeed, source, demo, live, stop, reset }
+  return { running, speed, setSpeed, source, last, demo, live, stop, reset }
 }

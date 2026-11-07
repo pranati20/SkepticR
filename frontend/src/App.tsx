@@ -7,6 +7,7 @@ import PapersView from './views/PapersView'
 import ReplicationView from './views/ReplicationView'
 import UploadView from './views/UploadView'
 import ChatView from './views/ChatView'
+import MethodsView from './views/MethodsView'
 
 const SCENARIOS = [
   { id: 'market', label: 'Stock-picking AI (simulated stocks)' },
@@ -18,7 +19,7 @@ const SCENARIOS = [
 ]
 const TABS = [
   ['ask', 'Ask the assistant'], ['court', 'Watch it work'], ['upload', 'Check my data'], ['replicate', 'Check a paper'],
-  ['split', 'AI vs Skeptic'], ['papers', 'Papers it used'],
+  ['split', 'AI vs Skeptic'], ['methods', 'Improve the algorithm'], ['papers', 'Papers it used'],
 ] as const
 
 export default function App() {
@@ -53,7 +54,10 @@ export default function App() {
             <button key={id} onClick={() => setTab(id)} className={`rounded-lg px-3 py-1.5 text-sm transition ${tab === id ? 'bg-accent/90 font-semibold text-ink' : 'text-slate-300 hover:text-white'}`}>{label}</button>
           ))}
         </nav>
-        <div className="ml-auto text-xs text-mute">{run.source || ''}</div>
+        <div className="ml-auto flex items-center gap-3 text-xs text-mute">{run.source || ''}
+          {s.done && run.last && s.proposals.length > 0 && (
+            <a className="btn-primary" href={`/api/report?${run.last.run ? 'run=' + run.last.run : 'demo=' + run.last.demo}`} download>⬇ Export report (PDF)</a>
+          )}</div>
       </header>
 
       {showControls && (
@@ -90,6 +94,7 @@ export default function App() {
 
       <div hidden={tab !== 'ask'}><ChatView onAudit={auditFromChat} /></div>
       {tab === 'court' && <CourtView s={s} />}
+      {tab === 'methods' && <MethodsView />}
       {tab === 'split' && <SplitView s={s} />}
       {tab === 'papers' && <PapersView />}
       {tab === 'replicate' && <ReplicationView s={s} running={run.running} run={(p) => run.live('replication', p)} demo={() => run.demo('replication')} />}

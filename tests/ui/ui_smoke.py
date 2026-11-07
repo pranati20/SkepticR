@@ -40,6 +40,11 @@ with sync_playwright() as p:
     assert "naive ai analyst" in pg.inner_text("body").lower()
     pg.screenshot(path=str(OUT / "split.png"), full_page=True)
 
+    assert pg.get_by_text("Export report (PDF)").count() == 1, "export button missing"
+    pg.get_by_role("button", name="Improve the algorithm").click()
+    pg.wait_for_function("document.body.innerText.toLowerCase().includes('equations from the paper')", timeout=90000)
+    assert pg.locator(".katex").count() > 0, "equations not rendered"
+    pg.screenshot(path=str(OUT / "methods.png"), full_page=True)
     pg.get_by_role("button", name="Papers it used").click(); pg.wait_for_timeout(800)
     assert "papers & datasets it has looked at" in pg.inner_text("body").lower(), "papers tab missing"
     pg.screenshot(path=str(OUT / "papers.png"), full_page=True)

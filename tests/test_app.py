@@ -252,3 +252,48 @@ def test_chat_context_steers_run_and_reaches_prosecutors(monkeypatch):
     assert fams == {"mean_reversion"}                                   # question steered the hunters
     lits = [e for e in ev if e["type"] == "literature"]
     assert lits and any(p.get("from_chat") for e in lits for p in e["papers"])   # chat paper reached the Librarian evidence
+
+
+def test_tear_sheet_pdf_for_demo_and_live_run():
+    r = client.get("/api/report", params={"demo": "betting"})
+    assert r.status_code == 200 and r.headers["content-type"] == "application/pdf" and r.content[:5] == b"%PDF-" and len(r.content) > 2000
+    assert client.get("/api/report").status_code == 400
+    assert client.get("/api/report", params={"demo": "nope"}).status_code == 404
+    assert client.get("/api/report", params={"run": "nope"}).status_code == 404
+    rid = client.post("/api/run", json={"scenario": "synthetic", "params": {"n_worlds": 60, "rounds": 1, "per_hunter": 3}}).json()["run_id"]
+    import time
+    for _ in range(300):
+        d = client.get(f"/api/runs/{rid}/events").json()
+        if d["done"]:
+            break
+        time.sleep(0.5)
+    r = client.get("/api/report", params={"run": rid})
+    assert r.status_code == 200 and r.content[:5] == b"%PDF-"
+
+
+def test_methods_research_uses_only_live_results_and_verbatim_equations(monkeypatch):
+    from skeptic.backend import methods as M, literature as LIT
+    page = r'<h2>2 Method</h2><math class="ltx_Math" alttext="\alpha_{t}=\gamma_{t}(R_{1},\dots,R_{t-1})" display="block"></math><math alttext="x" display="inline"></math>'
+    monkeypatch.setattr(LIT, "_get", lambda url, t: page.encode())
+    monkeypatch.setattr(LIT, "_cached", lambda kind, q, fn: fn())
+    eq = M.equations("1710.00499")
+    assert len(eq) == 1 and eq[0]["latex"].startswith(r"\alpha_{t}=") and eq[0]["section"] == "2 Method"          # inline math ignored, LaTeX verbatim
+    assert M._arxiv_id("https://doi.org/10.48550/arxiv.1809.07292") == "1809.07292" and M._arxiv_id("https://doi.org/10.3905/x") is None
+    paper = {"title": "Online control of the false discovery rate", "authors": "A", "year": 2017, "venue": "", "url": "http://arxiv.org/abs/1710.00499v1",
+             "abstract": "online false discovery rate alpha-investing procedure", "source": "arXiv (live)"}
+    monkeypatch.setattr(LIT, "live_search", lambda q, n=6: ([paper], ["arXiv: 1 results"]))
+    M._CACHE.clear()
+    monkeypatch.delenv("SKEPTIC_OFFLINE", raising=False)
+    d = M.research()
+    got = [p for t in d["topics"] for p in t["papers"]]
+    assert got and all(p["title"] == paper["title"] for p in got) and got[0]["equations"]
+    c = M.conclusion(d, "three bullets")
+    assert "[S1]" in c["text"] and "http" not in c["text"] and c["llm"].startswith("offline")
+    M._CACHE.clear()
+
+
+def test_methods_endpoint_offline_finds_nothing():
+    r = client.post("/api/methods", json={"style": "short"})
+    assert r.status_code == 200 and r.json()["topics"] and all(t["papers"] == [] for t in r.json()["topics"])
+    assert "nothing to conclude" in r.json()["conclusion"]["text"]
+    assert client.post("/api/methods", json={"style": 5}).status_code == 400

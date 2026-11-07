@@ -11,3 +11,4 @@ matplotlib
 jsonschema
 yfinance
 httpx
+reportlab

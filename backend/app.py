@@ -126,6 +126,39 @@ def library_list():
     return {"looked_at": library.entries()}
 
 
+@app.post("/api/methods")
+def methods(body: dict):
+    """Literature scan for ways to strengthen our own algorithms. The topics are fixed by the system; the caller only supplies a display style."""
+    from . import methods as M
+    style = body.get("style", "") if isinstance(body, dict) else ""
+    if not isinstance(style, str):
+        raise HTTPException(400, "style must be text")
+    data = M.research()
+    return _clean({**data, "conclusion": M.conclusion(data, style)})
+
+
+@app.get("/api/report")
+def report(run: str = "", demo: str = ""):
+    """Download the one-page PDF tear sheet of a finished run (a live run id, or a recorded demo name)."""
+    from fastapi.responses import Response
+    from .report import build_pdf
+    if run:
+        st = RUNS.get(run)
+        if st is None:
+            raise HTTPException(404, "no such run")
+        events, name = st["events"], st.get("scenario", "run")
+    elif demo:
+        f = DEMO / "runs" / f"{Path(demo).name}.json"
+        if not f.exists():
+            raise HTTPException(404, "no such recorded run")
+        events, name = json.loads(f.read_text(encoding="utf-8")), Path(demo).name
+    else:
+        raise HTTPException(400, "give ?run=<id> or ?demo=<name>")
+    if not any(e.get("type") == "verdict" for e in events):
+        raise HTTPException(409, "this run has no verdicts yet (is it finished?)")
+    return Response(build_pdf(events), media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="skeptic_tearsheet_{name}.pdf"'})
+
+
 @app.get("/api/demo")
 def demo_list():
     d = DEMO / "runs"
