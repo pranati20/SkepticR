@@ -22,7 +22,7 @@ git clone https://github.com/pranati20/SkepticR.git skeptic
 
 # 2. Backend (Python 3.12 recommended)
 python -m venv .venv
-.venv\Scriptsctivate            # Windows PowerShell   (macOS/Linux: source .venv/bin/activate)
+.venv\Scripts\Activate.ps1          # Windows PowerShell   (macOS/Linux: source .venv/bin/activate)
 pip install -r skeptic/requirements.txt
 
 # 3. Run the app (UI is pre-built and committed in skeptic/frontend/dist)
