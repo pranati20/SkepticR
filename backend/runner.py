@@ -21,6 +21,7 @@ from .adapters.market_panel import simulate_market_panel
 from .adapters.synthetic import SynthConfig, generate
 from .court import stats as S
 from .court.pipeline import Court, CourtConfig, score_against_truth
+from . import literature as LIT
 from .hunters import base as H
 from .ledger import Ledger
 from .llm import LLM
@@ -57,6 +58,7 @@ class Ctx:
         self.ledger = Ledger()
         self.run_id = self.ledger.start_run("run", {"seed": seed})
         self.seed = seed
+        self.online_literature = False
         self.llm.meter.listeners.append(lambda snap: self.emit("tokens", **snap))
 
     def emit(self, type_: str, **kw):
@@ -80,7 +82,7 @@ def _naive(ctx: Ctx, search: Search, descr: Callable[[int], str]):
     from scipy import stats as st
     n = search.T
     p = 2 * st.t.sf(np.abs(t), max(n - 1, 1))
-    idx = [int(i) for i in np.argsort(p) if p[i] < 0.05 and t[i] > 0]
+    idx = [int(i) for i in range(search.K) if p[i] < 0.05 and t[i] > 0]          # in the order the analyst found them
     ctx.emit("naive", count=len(idx), total=search.K,
              claims=[{"id": search.hyps[i]["id"], "text": descr(i), "t": float(t[i]), "p": float(p[i])} for i in idx])
 
@@ -145,12 +147,33 @@ def run_synthetic(ctx: Ctx, params: dict) -> dict:
     return _court(ctx, search, params, truth=True, log_tests=False)
 
 
+def _librarian(ctx: Ctx, search: Search):
+    """Librarian: find papers per hypothesis family, check they APPLY to this scenario, hand the evidence to the Prosecutors."""
+    dates = search.dates
+    sc = LIT.Scenario.from_meta(search.meta, dates, n_assets=int(search.meta.get("n_assets", 117 if search.meta.get("survivorship_bias") else 150)))
+    lib = LIT.Librarian(sc, online=bool(ctx.online_literature))
+    ctx.emit("agent", agent="Librarian", text=f"Searching the literature and checking it against this scenario ({sc.start_year}-{sc.end_year}, {sc.universe})")
+    evid, per_family = {}, {}
+    for h in search.hyps:
+        evid[h["id"]] = lib.evidence(h)
+        per_family.setdefault(h.get("family", "?"), evid[h["id"]])
+    for fam, ev in per_family.items():
+        top = [p for p in ev["papers"] if p.get("relevance", 0) > 0][:2]
+        if top:
+            ctx.emit("literature", family=fam, scenario={"start_year": sc.start_year, "end_year": sc.end_year, "universe": sc.universe, "survivor_universe": sc.survivor_universe},
+                     papers=top, has_direct_support=ev["has_direct_support"], expected_haircut=ev["expected_haircut"], caveats=ev["caveats"])
+    search.literature = evid
+    search.extra_attack_fns = (search.extra_attack_fns or []) + [LIT.literature_attack_factory(evid)]
+
+
 def _court(ctx: Ctx, search: Search, params: dict, truth: bool, log_tests: bool = False) -> dict:
     cfg = CourtConfig(seed=ctx.seed, n_worlds=int(params.get("n_worlds", 300)), n_rounds=int(params.get("rounds", 4)),
                       use_alpha_investing=bool(params.get("alpha_investing", True)))
     for h in search.hyps:
         h.setdefault("round", -1)
     review_fn = review.make_llm_review(ctx.llm) if search.domain in ("market",) else None
+    if search.domain in ("market", "synthetic") and search.pnl is not None:
+        _librarian(ctx, search)
     court = Court(ctx.ledger, ctx.llm.meter, review_fn, ctx.court_emit, cfg)
     res = court.run(search, ctx.run_id, log_tests=log_tests)
     if truth and search.truth is not None:
@@ -262,6 +285,13 @@ def run_replication(ctx: Ctx, params: dict) -> dict:
     ctx.emit("replication", stage="extracted", extracted=obj, formula=base)
     panel = EQ.load_panel() if real else simulate_market_panel(ctx.seed, decay_after=900)
     holdout = 504 if real else 252
+    lib = LIT.Librarian(LIT.Scenario.from_meta(panel.meta, panel.dates, n_assets=panel.shape[1]), online=bool(ctx.online_literature))
+    ctx.emit("agent", agent="Librarian", text="Finding the source paper and checking it against this scenario")
+    found = lib.find(text + " " + obj["name"], "mean_reversion" if "revers" in obj["name"].lower() else None)
+    ctx.emit("literature", family="replication", papers=[p for p in found if p.get("relevance", 0) > 0][:3], has_direct_support=bool(found),
+             scenario={"start_year": int(panel.dates[0].year), "end_year": int(panel.dates[-1].year), "universe": panel.meta.get("source"),
+                       "survivor_universe": bool(panel.meta.get("survivorship_bias"))},
+             expected_haircut=max([p.get("expected_haircut", 0) for p in found], default=0.0), caveats=sorted({c for p in found[:2] for c in p.get("caveats", [])})[:4])
     pub = pd.Timestamp(params["pub_date"]) if params.get("pub_date") else (panel.dates[900] if not real else None)
     if not real:
         ctx.emit("agent", agent="Replicator", text=f"Stand-in world: the effect is arbitrage-limited and decays after {pub.date()}")

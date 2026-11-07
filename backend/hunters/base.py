@@ -167,12 +167,11 @@ def mock_hunter(hint: dict) -> dict:
              "rationale": f"Template variant in family {fam}.", "source_paper": None}
         r = rng.random()
         if r < 0.06:
-            h["universe"] = "current_constituents"; h["description"] += " [current constituents only]"; h["rationale"] += " Uses today's listed names."
+            h["universe"] = "current_constituents"
         elif r < 0.10:
             h["hold"] = int(rng.choice([5, 21]))
         if rng.random() < 0.03:                                     # sloppy hunter: accidentally peeks into the future
             h["feature_formula"] = f"lead(ret, 1) + 0.0 * ({formula})"
-            h["description"] += " [uses next-day return]"
         out.append(h)
     return {"hypotheses": out[:n]}
 

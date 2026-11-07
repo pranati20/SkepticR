@@ -30,7 +30,7 @@ class CourtConfig:
     seed: int = 0
     attack: AttackConfig = field(default_factory=AttackConfig)
     wealth0: float = 0.09
-    payout: float = 0.05
+    payout: float = 0.04
     use_alpha_investing: bool = True
     flat_alpha: float = 0.05            # used when alpha-investing is off
     run_prosecutors: bool = True
@@ -134,9 +134,8 @@ class Court:
                 self._e("verdict", **v.to_dict(), family=search.hyps[i].get("family"), round=r,
                         formula=search.hyps[i].get("spec", {}).get("formula"), description=search.hyps[i].get("description"))
             if cfg.use_alpha_investing:
-                if n_disc:
-                    for _ in range(n_disc):
-                        ai.update(level, True, label=f"round{r}")
+                if n_disc:        # one payout per validated round: near-duplicate discoveries must not print money
+                    ai.update(level, True, label=f"round{r}: {n_disc} discoveries")
                 else:
                     ai.update(level, False, label=f"round{r}")
             self._e("credibility", wealth=ai.wealth, wealth0=ai.wealth0, history=ai.history[-1], round=r)

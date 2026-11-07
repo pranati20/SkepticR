@@ -39,6 +39,7 @@ class Search:
     extra_attack_fns: list | None = None    # appended to the default list
     oos_fn: Callable | None = None          # oos_fn(k) -> {n_days, oos_sharpe, t, p_one_sided, confirmed}
     unit: str = "days"                      # unit of "more data needed"
+    literature: dict | None = None          # Librarian evidence per hypothesis id (fed to the literature attack)
     domain: str = "market"
     meta: dict = field(default_factory=dict)
 

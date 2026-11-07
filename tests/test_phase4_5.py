@@ -92,3 +92,21 @@ def test_no_eval_or_exec_in_codebase():
     for f in root.rglob("*.py"):
         src = f.read_text(encoding="utf-8")
         assert not re.search(r"(?<![\w.])(eval|exec)\(", src.replace("evaluate(", "")), f
+
+
+def test_librarian_finds_applicable_papers_and_feeds_prosecutor():
+    from skeptic.backend import literature as LIT
+    sc = LIT.Scenario(start_year=2010, end_year=2025, n_assets=117, survivor_universe=True)
+    lib = LIT.Librarian(sc, online=False)
+    ev = lib.evidence({"description": "10-day reversal", "family": "mean_reversion", "spec": {"formula": "-ts_return(close, 10)"}})
+    assert ev["has_direct_support"] and ev["expected_haircut"] >= 0.5
+    assert any("post-publication" in c for c in ev["caveats"])
+    assert not any(p["id"] == "bickel75" for p in ev["papers"])          # unrelated paper must not match
+    none = lib.evidence({"description": "weekday tilt", "family": "calendar", "spec": {"formula": "dow() * rolling_mean(ret, 5)"}})
+    assert not none["has_direct_support"]
+    # attack: an implausibly good, unsupported idea is flagged (advisory, medium severity)
+    class S:  # minimal stand-in search
+        hyps = [{"id": "x"}]
+        pnl = np.random.default_rng(0).normal(0.004, 0.01, (1, 800))
+    r = LIT.literature_attack_factory({"x": none})(S, 0, None)
+    assert r["attack"] == "literature" and r["severity"] == "medium" and not r["survived"]

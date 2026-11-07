@@ -17,9 +17,9 @@ REVIEW_SCHEMA = {
 def mock_review(hint: dict) -> dict:
     spec, desc = hint["spec"], hint.get("description", "")
     c = []
-    if spec.get("uses_future_bar") or "next-day" in desc:
+    if spec.get("uses_future_bar"):
         c.append({"kind": "lookahead", "detail": "formula or description references next-bar information"})
-    if spec.get("universe") == "current_constituents" or "current constituents" in desc:
+    if spec.get("universe") == "current_constituents":
         c.append({"kind": "survivorship", "detail": "universe is today's listed names"})
     if len(spec.get("windows", [])) >= 3:
         c.append({"kind": "overfitting", "detail": "many tunable windows"})
