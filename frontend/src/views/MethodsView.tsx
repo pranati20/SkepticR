@@ -3,7 +3,7 @@ import katex from 'katex'
 import 'katex/dist/katex.min.css'
 
 type Eq = { latex: string; section: string }
-type Paper = { title: string; authors: string; year: number | null; venue: string; url: string | null; source: string; abstract: string; cited_by?: number | null; equations: Eq[]; equation_note: string }
+type Paper = { used?: string; title: string; authors: string; year: number | null; venue: string; url: string | null; source: string; abstract: string; cited_by?: number | null; equations: Eq[]; equation_note: string }
 type Topic = { id: string; title: string; component: string; papers: Paper[]; status: string[] }
 type Data = { topics: Topic[]; conclusion: { text: string; llm: string; style: string } }
 
@@ -73,6 +73,7 @@ export default function MethodsView() {
                       {p.url ? <a href={p.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-sky-300 hover:underline">{p.title}</a> : <span className="text-sm font-medium">{p.title}</span>}
                       <div className="text-[11px] text-mute">{[p.authors, p.year, p.venue].filter(Boolean).join(' · ')} · {p.source}{p.cited_by ? ` · cited ${p.cited_by}×` : ''}</div>
                       {p.abstract && <div className="mt-1 line-clamp-3 text-xs text-slate-400">{p.abstract}</div>}
+                      {p.used && <div className="mt-1 rounded border-l-2 border-accent/60 bg-ink/50 px-2 py-1 text-[11px] leading-snug text-slate-300"><b className="text-accent">What we used:</b> {p.used}</div>}
                     </div>
                   </div>
                   {p.equations.length > 0 ? (

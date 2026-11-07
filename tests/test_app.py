@@ -329,5 +329,5 @@ def test_conclusion_uses_only_valid_findings(tmp_path):
     if valid_ids:                                                                    # the model prompt never contains rejected ideas either
         out = CC.conclude("Do supplements help?", ev, LLM(provider=Spy(), cache_dir=tmp_path, use_cache=False))
         assert not any(("] " + d + " |") in seen["prompt"] for d in rejected) and "[F99]" not in out["text"] and "http" not in out["text"] and "[F1]" in out["text"]
-    none = CC.conclude("anything?", [{"type": "verdict", "hypothesis_id": "a", "verdict": "LUCK", "description": "lucky idea"}])
+    none = CC.conclude("Does anything increase it?", [{"type": "verdict", "hypothesis_id": "a", "verdict": "LUCK", "description": "lucky idea"}])
     assert none["status"] == "none" and "No valid conclusion" in none["text"] and "lucky idea" not in none["text"]

@@ -51,3 +51,24 @@ def test_conclusion_has_plain_english_answer():
     assert r["answer"].startswith("Yes.") and "Why:" in r["answer"] and "not proof of cause" in r["answer"]
     none = C.plain_answer("q?", {"findings": [], "n_tested": 5, "n_luck": 5, "n_unclear": 0, "n_valid_total": 0})
     assert none.startswith("Can't say")
+
+
+def test_question_decides_the_analysis_not_a_fixed_answer():
+    from skeptic.backend import conclude as C
+    assert C.classify("What are the outliers in the data?") == "outliers"
+    assert C.classify("Does X increase Y?") == "effect"
+    assert C.classify("tell me a joke") == "other"
+    ev, _ = run_scenario("health", {"n_worlds": 120, "question": "What are the outliers in the health supplement data?"})
+    c = next(e for e in ev if e["type"] == "conclusion")
+    assert c["kind"] == "outliers" and c["findings"] == [] and "outlier" in c["answer"]
+    assert not c["answer"].startswith("Yes.")
+    ev, _ = run_scenario("health", {"n_worlds": 120, "question": "tell me a joke"})
+    assert next(e for e in ev if e["type"] == "conclusion")["answer"].startswith("Can't say")
+
+
+def test_every_paper_says_what_was_used_from_it():
+    from skeptic.backend import literature as L
+    p = {"title": "t", "abstract": "Background sentence here is long enough to count. We show that survivorship bias inflates average returns materially."}
+    u = L.used_paragraph(p, L.METHOD_USE["survivorship"], ["survivorship"])
+    assert "survivorship bias inflates" in u and "Survivorship Prosecutor" in u and "abstract only" in u
+    assert "No abstract" in L.used_paragraph({"title": "t"}, "x")

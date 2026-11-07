@@ -59,6 +59,7 @@ class Ctx:
         self.ledger = Ledger()
         self.run_id = self.ledger.start_run("run", {"seed": seed})
         self.seed = seed
+        self.table = None                                                   # tabular spec (the data) when the scenario has one
         self.context: dict | None = None                                    # question + papers sent from the chat tab
         self.online_literature = os.environ.get("SKEPTIC_OFFLINE") != "1"   # live paper search by default
         self.llm.meter.listeners.append(lambda snap: self.emit("tokens", **snap))
@@ -242,6 +243,7 @@ def run_betting(ctx: Ctx, params: dict) -> dict:
 
 
 def _tabular(ctx: Ctx, name: str, spec: TB.TabularSpec, params: dict, standin=True) -> dict:
+    ctx.table = spec
     search = TB.build_tabular_search(spec, ctx.seed)
     _meta(ctx, name, standin=standin, claim=spec.claim, panel={"n": search.meta["n"], "n_search": search.meta["n_search"], "n_holdout": search.meta["n_holdout"],
                                                               "treat": spec.treat, "outcomes": spec.outcomes, "strata": spec.strata_cols or [],
@@ -413,7 +415,7 @@ def run_scenario(name: str, params: dict | None = None, emit: Callable[[dict], N
     if isinstance(q, str) and q.strip():                      # prompt-first flow: conclude from the VALID findings only
         from . import conclude as CC
         try:
-            ctx.emit("conclusion", **CC.conclude(q, ctx.events, ctx.llm))
+            ctx.emit("conclusion", **CC.conclude(q, ctx.events, ctx.llm, ctx.table))
         except Exception as e:  # noqa: BLE001
             ctx.emit("error", message=f"Could not write the conclusion: {type(e).__name__}: {e}")
     ctx.emit("done", scenario=name, seconds=round(time.time() - ctx.t0, 1))

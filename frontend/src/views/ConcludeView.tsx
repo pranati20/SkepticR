@@ -19,12 +19,13 @@ const DATASETS = [
 
 function Conclusion({ c }: { c: any }) {
   const none = c.status === 'none'
+  const outl = c.kind === 'outliers'
   return (
     <div className={`card p-4 ${none ? 'border-amber-400/40' : 'border-disc/40'}`}>
       <div className="mb-1 flex flex-wrap items-center gap-2">
-        <span className="text-lg font-bold">{none ? 'No valid conclusion' : 'Conclusion from the valid findings'}</span>
+        <span className="text-lg font-bold">{outl ? 'Outliers in the data' : none ? 'No valid conclusion' : 'Conclusion from the valid findings'}</span>
         <span className={`rounded-full border px-2 py-0.5 text-[11px] ${none ? 'border-amber-400 text-amber-300' : 'border-disc text-disc'}`}>
-          {c.n_valid} of {c.n_tested} candidate findings survived
+          {outl ? 'described from the data' : `${c.n_valid} of ${c.n_tested} candidate findings survived`}
         </span>
       </div>
       <div className="text-xs text-mute">Your question: “{c.question}”</div>

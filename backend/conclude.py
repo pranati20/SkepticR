@@ -61,6 +61,77 @@ def facts(events: list[dict]) -> dict:
             "top_causes": [k for k, _ in causes.most_common(3)], "data": {"treat": pan.get("treat"), "outcomes": pan.get("outcomes")}}
 
 
+EFFECT_RE = re.compile(r"increas|decreas|effect|improv|help|reduc|rais|lower|higher|better|worse|impact|caus|boost|harm|benefit|work|affect|change|differ|compar|less|more|safe|risk", re.I)
+OUTLIER_RE = re.compile(r"outlier|anomal|unusual|extreme|abnormal|weird|strange|exceptional|suspicious", re.I)
+
+
+def classify(question: str) -> str:
+    """What is the user asking? 'outliers' | 'effect' (does X change Y) | 'other'. Plain keyword rules, so it is inspectable."""
+    q = question or ""
+    if OUTLIER_RE.search(q):
+        return "outliers"
+    return "effect" if EFFECT_RE.search(q) else "other"
+
+
+def outlier_answer(question: str, table) -> dict | None:
+    """Answer 'what are the outliers' from the DATA itself: robust z-score (median/MAD > 3.5), how many, where they concentrate, extremes.
+    Descriptive: it is not run through the luck audit, and an outlier is not necessarily an error."""
+    import pandas as pd
+    from scipy import stats as st
+    if table is None:
+        return None
+    df, treat = table.df, table.treat
+    cols = [c for c in table.outcomes if c in df.columns and pd.api.types.is_numeric_dtype(df[c])]
+    cats = [c for c in table.subgroup_cols if c in df.columns]
+    if not cols:
+        return None
+    N = len(df)
+    out, tops = [], []
+    for c in cols:
+        x = df[c].astype(float)
+        med = x.median()
+        mad = (x - med).abs().median() or 1e-9
+        z = 0.6745 * (x - med) / mad
+        mask = z.abs() > 3.5
+        n = int(mask.sum()); hi = int((z > 3.5).sum()); lo = int((z < -3.5).sum())
+        exp = N * 2 * st.norm.sf(3.5)
+        if n <= max(3, 2 * exp):
+            verdict = "about what a normal bell curve would produce"
+        else:
+            verdict = f"about {n / max(exp, 1e-9):.0f}x more than a normal bell curve would produce, so the data has unusually heavy tails"
+        out.append(f"In {c}, {n} of {N:,} values ({100 * n / N:.2f}%) are outliers: {hi} unusually high and {lo} unusually low. That is {verdict} (expected about {exp:.0f}).")
+        if n == 0:
+            r0 = df.assign(_z=z).sort_values("_z", key=lambda s: -s.abs()).iloc[0]
+            tops.append(f"The most extreme value is {r0[c]:.2f} ({abs(r0['_z']):.1f} robust standard deviations from typical, below the 3.5 cut-off), so none is a real outlier.")
+        if n:
+            ex = df.loc[mask].assign(_z=z[mask]).sort_values("_z", key=lambda s: -s.abs()).head(3)
+            tops.append(f"Most extreme {c} values: " + "; ".join(
+                f"{r[c]:.2f} (" + ", ".join(f"{k}={r[k]}" for k in (cats + [treat])[:3] if k in df.columns) + ")" for _, r in ex.iterrows()) + ".")
+            tests = []
+            for g in cats + [treat]:
+                if g not in df.columns or df[g].nunique() > 12:
+                    continue
+                tab = pd.crosstab(df[g], mask)
+                if tab.shape[1] < 2 or tab.shape[0] < 2:
+                    continue
+                pv = st.chi2_contingency(tab)[1]
+                tests.append((pv * (len(cats) + 1), g, tab))      # Bonferroni across the columns looked at
+            tests.sort(key=lambda r: r[0])
+            if tests and tests[0][0] < 0.05:
+                pv, g, tab = tests[0]
+                share = tab[True] / tab.sum(axis=1)
+                top = share.idxmax()
+                out.append(f"They are not spread evenly: they cluster in {g} = {top} ({100 * share[top]:.1f}% of that group are outliers versus {100 * n / N:.1f}% overall; "
+                           f"adjusted p = {min(pv, 1):.1g}, so this is unlikely to be chance).")
+            elif tests:
+                out.append("They are spread roughly evenly across the groups, with no group standing out after correcting for the number of groups checked.")
+    if not out:
+        return None
+    note = ("How this was found: a value is an outlier if it is more than 3.5 robust standard deviations (median and MAD) from the typical value. "
+            "This describes the data; it is not a luck-audited discovery, and an outlier is not necessarily an error, so check it before dropping it.")
+    return {"answer": " ".join(out + tops), "note": note}
+
+
 def _segment(fid: str) -> tuple[str, str]:
     """'conversion|device=mobile' -> ('conversion', 'device=mobile'); 'bet|all predicted bets' -> ('bet', 'all predicted bets')."""
     o, _, s = fid.partition("|")
@@ -111,12 +182,28 @@ def _sanitize(text: str, n: int) -> str:
     return re.sub(r"https?://\S+", "", text).strip()
 
 
-def conclude(question: str, events: list[dict], llm: LLM | None = None) -> dict:
+def conclude(question: str, events: list[dict], llm: LLM | None = None, table=None) -> dict:
     question = (question or "").strip()[:500]
+    kind = classify(question)
+    if kind == "outliers":
+        o = outlier_answer(question, table)
+        if o:
+            return {"question": question, "kind": "outliers", "status": "outliers", "findings": [], "n_valid": 0, "n_tested": 0, "n_luck": 0, "n_unclear": 0,
+                    "top_causes": [], "answer": o["answer"], "llm": "none", "text": o["answer"] + "\n\n" + o["note"]}
+        kind = "other"
+    if kind == "other":
+        f0 = facts(events)
+        d0 = f0["data"]
+        tested = (f"This run tested whether {d0['treat']} changes {', '.join(d0['outcomes'] or [])} in different groups. " if d0.get("treat") else "")
+        txt = ("Can't say. This audit can answer two kinds of question: does X change Y (checked for luck and bias), and what are the outliers. "
+               f"Your question looks like neither, so I will not force an answer out of unrelated results. {tested}"
+               "Try rephrasing, for example: Does <factor> increase <outcome>? or What are the outliers in <outcome>?")
+        return {"question": question, "kind": "other", "status": "none", "findings": [], "n_valid": 0, "n_tested": f0["n_tested"], "n_luck": 0, "n_unclear": 0,
+                "top_causes": [], "answer": txt, "llm": "none", "text": txt}
     f = facts(events)
     fs = f["findings"]
     base = {"question": question, "findings": fs, "n_valid": f["n_valid_total"], "n_tested": f["n_tested"], "n_luck": f["n_luck"],
-            "n_unclear": f["n_unclear"], "top_causes": f["top_causes"], "answer": plain_answer(question, f)}
+            "n_unclear": f["n_unclear"], "top_causes": f["top_causes"], "answer": plain_answer(question, f), "kind": "effect"}
     def with_answer(r: dict) -> dict:
         """Put the plain-English answer at the top of the write-up the UI already displays."""
         body = r["text"] if r["text"].startswith(("Yes", "No", "It depends", "Can't say")) else base["answer"] + NL + r["text"]

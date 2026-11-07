@@ -98,6 +98,9 @@ def _topic(t: dict) -> dict:
         papers.append({"title": re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", p["title"])).strip(), "authors": p.get("authors", ""), "year": p.get("year"), "venue": p.get("venue", ""),
                        "url": p.get("url"), "source": p.get("source", ""), "abstract": (p.get("abstract") or "")[:500],
                        "cited_by": p.get("cited_by"), "equations": eq, "equation_note": note})
+    from .literature import used_paragraph
+    for p in papers:
+        p["used"] = used_paragraph(p, f"strengthening Skeptic's {t['component']}", t["title"].lower().split())
     return {"id": t["id"], "title": t["title"], "component": t["component"], "papers": papers, "status": notes}
 
 

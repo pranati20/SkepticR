@@ -229,6 +229,7 @@ class Librarian:
             for rel, p in [x for x in ranked if x[0] >= 2][:top]:
                 found.append({**p, "id": p.get("doi") or p["url"], "claim": (p.get("abstract") or "")[:240] or "(no abstract returned: open the link)",
                               "sample": None, "universe": None, "relevance": round(rel, 1), **assess_live(p, self.scenario)})
+                found[-1]["used"] = used_paragraph(p, self._use_text(found[-1]), terms)
         if self.extra:                                       # papers from the user's chat: judged by the same relevance rule, no finance filter
             query = FAMILY_QUERY.get(family or "", "") or " ".join(_terms(text)[:8])
             terms = _terms(query)
@@ -241,6 +242,7 @@ class Librarian:
                     found.append({**p, "id": p.get("url") or p["title"], "from_chat": True,
                                   "claim": (p.get("abstract") or "")[:240] or "(no abstract: open the link)", "sample": None, "universe": None,
                                   "relevance": round(rel, 1), **assess_live(p, self.scenario)})
+                    found[-1]["used"] = used_paragraph(p, self._use_text(found[-1]), terms)
             found.sort(key=lambda p: -p["relevance"])
             found = found[:top + 2]
             self.status = self.status + [f"{len(self.extra)} paper(s) carried over from your chat"]
@@ -253,6 +255,12 @@ class Librarian:
         except Exception:  # noqa: BLE001  the library is bookkeeping; never break a run
             pass
         return found
+
+    def _use_text(self, f: dict) -> str:
+        sc = self.scenario
+        hc = f.get("expected_haircut") or 0
+        return (f"the Literature Prosecutor: to check whether this idea is known and whether its published result still applies to your data "
+                f"({sc.start_year}-{sc.end_year}, {sc.universe})" + (f"; it implies an expected {hc:.0%} weaker effect than published" if hc else ""))
 
     def evidence(self, hyp: dict) -> dict:
         """Literature evidence for one hypothesis: supporting papers, applicability, implied haircut, and a prior suggestion."""
@@ -284,7 +292,7 @@ def literature_attack_factory(evidence: dict[str, dict]):
             notes.append(f"Observed Sharpe {sr:.1f} is far above what the literature makes plausible for this idea today (~{plausible_max:.1f}). "
                          "Too good to be true: look for leakage or a data artefact.")
         return {"attack": "literature", "severity": "medium", "survived": ok, "evidence": {
-            "observed_sharpe": sr, "papers": [{k2: p[k2] for k2 in ("authors", "year", "title", "applicability", "url", "source") if k2 in p} for p in ev.get("papers", [])[:3]],
+            "observed_sharpe": sr, "papers": [{k2: p[k2] for k2 in ("authors", "year", "title", "applicability", "url", "source", "used") if k2 in p} for p in ev.get("papers", [])[:3]],
             "expected_post_publication_haircut": hc, "caveats": ev.get("caveats", []), "notes": notes}}
     return literature
 
@@ -322,10 +330,44 @@ def methods_scout(online: bool = True, per_attack: int = 2) -> dict:
             for p in openalex(q, 10):
                 chk = validate_method_paper(p, must)
                 if chk:
-                    found.append({k: p.get(k) for k in ("title", "authors", "year", "venue", "url", "doi", "cited_by", "source")} | {"checks": chk})
+                    found.append({k: p.get(k) for k in ("title", "authors", "year", "venue", "url", "doi", "cited_by", "source")} | {"checks": chk}
+                             | {"used": used_paragraph(p, METHOD_USE.get(area, "a Prosecutor check"), list(must))})
             found.sort(key=lambda x: -(x["cited_by"] or 0))
             out[area] = found[:per_attack]
             status.append(f"{area}: {len(out[area])} validated of 10 returned")
         except Exception as e:  # noqa: BLE001
             status.append(f"{area}: OpenAlex unavailable ({str(e)[:50] or type(e).__name__})")
     return {"papers": out, "status": status}
+
+
+# ---------------------------------------------------------------- "what did we use from this paper?"
+METHOD_USE = {
+    "multiple testing / data snooping": "the null-world audit: the whole search is re-run in worlds where nothing is real, and each result is compared with the best that luck alone produced",
+    "leakage / lookahead": "the Leakage Prosecutor: it scans a feature for lookahead and checks whether next-day predictive power is implausibly high",
+    "survivorship": "the Survivorship Prosecutor: it re-runs an idea on the universe that existed at the time, including names that later disappeared",
+    "costs / capacity": "the Costs Prosecutor: it re-prices a strategy after realistic trading costs",
+    "factors / beta": "the Confounder Prosecutor: it checks whether an apparent edge is just exposure to known factors",
+    "post-publication decay": "the Literature Prosecutor: it applies a haircut when an effect was published before or inside your sample",
+    "peeking / sequential testing": "the Peeking Prosecutor: it judges an early look against the best result across all looks",
+}
+_STOP = {"the", "and", "for", "with", "that", "this", "from", "are", "was", "were", "its", "into", "our", "than", "have", "has"}
+
+
+def _quote(p: dict, terms: list[str]) -> str:
+    """The sentence of the paper's own abstract that best matches what we used it for (verbatim, trimmed)."""
+    abst = (p.get("abstract") or "").strip()
+    if not abst:
+        return ""
+    sents = [s.strip() for s in re.split(r"(?<=[.!?])\s+", abst) if len(s.strip()) > 30]
+    if not sents:
+        return abst[:220]
+    terms = [t for t in terms if t not in _STOP and len(t) > 3]
+    best = max(sents, key=lambda s: sum(t in s.lower() for t in terms))
+    return best[:240] + ("..." if len(best) > 240 else "")
+
+
+def used_paragraph(p: dict, use: str, terms: list[str] | None = None) -> str:
+    """A short, honest paragraph: what part of the paper was used, and for what. We only read the abstract and metadata, never the full text."""
+    q = _quote(p, terms or _terms(use))
+    src = f'From its abstract: "{q}" ' if q else "No abstract was returned, so only the title, year and venue were used. "
+    return f"{src}Used for {use}. (We read the abstract only, not the full text.)"

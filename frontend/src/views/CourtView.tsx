@@ -160,7 +160,7 @@ export function Detail({ s, id }: { s: RunState; id: string }) {
       {lit && lit.evidence.papers?.length > 0 && (
         <div>
           <div className="h-label mb-1">Librarian: papers checked against this scenario</div>
-          {lit.evidence.papers.map((p: any, i: number) => (<div key={i} className="text-xs text-slate-300">📄 {p.authors} ({p.year}) — {p.url ? <a href={p.url} target="_blank" rel="noreferrer" className="text-sky-300 underline">{p.title}</a> : p.title} <span className="text-mute">{p.source ? `${p.source} · ` : ''}· applicability {p.applicability ?? '–'}</span></div>))}
+          {lit.evidence.papers.map((p: any, i: number) => (<div key={i} className="text-xs text-slate-300">📄 {p.authors} ({p.year}) — {p.url ? <a href={p.url} target="_blank" rel="noreferrer" className="text-sky-300 underline">{p.title}</a> : p.title} <span className="text-mute">{p.source ? `${p.source} · ` : ''}· applicability {p.applicability ?? '–'}</span>{p.used && <div className="mt-1 rounded border-l-2 border-accent/60 bg-ink/50 px-2 py-1 text-[11px] leading-snug text-slate-300"><b className="text-accent">What we used:</b> {p.used}</div>}</div>))}
           {lit.evidence.caveats?.map((c: string, i: number) => <div key={i} className="mt-1 text-[11px] text-amber-300/90">• {c}</div>)}
         </div>
       )}
@@ -233,7 +233,7 @@ export default function CourtView({ s, compact = false }: { s: RunState; compact
                 <div className="text-[11px] font-semibold uppercase tracking-wide text-sky-300">{area}</div>
                 {ps.map((p: any, i: number) => (
                   <div key={i} className="text-xs text-slate-300">📄 {p.authors} ({p.year}) — <a href={p.url} target="_blank" rel="noreferrer" className="text-sky-300 underline">{p.title}</a>
-                    <span className="text-mute"> · {p.venue} · {p.cited_by} citations · peer-reviewed ✓ abstract ✓ on-topic ✓</span></div>
+                    <span className="text-mute"> · {p.venue} · {p.cited_by} citations · peer-reviewed ✓ abstract ✓ on-topic ✓</span>{p.used && <div className="mt-1 rounded border-l-2 border-accent/60 bg-ink/50 px-2 py-1 text-[11px] leading-snug text-slate-300"><b className="text-accent">What we used:</b> {p.used}</div>}</div>
                 ))}
               </div>
             ))}
