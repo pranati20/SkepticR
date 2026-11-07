@@ -4,7 +4,6 @@ import { useRun } from './useRun'
 import CourtView from './views/CourtView'
 import SplitView from './views/SplitView'
 import PapersView from './views/PapersView'
-import ReplicationView from './views/ReplicationView'
 import ChatView from './views/ChatView'
 import MethodsView from './views/MethodsView'
 import ConcludeView from './views/ConcludeView'
@@ -18,7 +17,7 @@ const SCENARIOS = [
   { id: 'ab_test', label: 'A/B test (peeking trap)' },
 ]
 const TABS = [
-  ['conclude', 'Find a conclusion'], ['ask', 'Find papers & data'], ['court', 'Watch it work'], ['replicate', 'Check a paper'],
+  ['conclude', 'Find a conclusion'], ['ask', 'Find papers & data'], ['court', 'Watch it work'],
   ['split', 'AI vs Skeptic'], ['methods', 'Improve the algorithm'], ['papers', 'Papers it used'],
 ] as const
 
@@ -97,7 +96,6 @@ export default function App() {
       {tab === 'methods' && <MethodsView />}
       {tab === 'split' && <SplitView s={s} />}
       {tab === 'papers' && <PapersView />}
-      {tab === 'replicate' && <ReplicationView s={s} running={run.running} run={(p) => run.live('replication', p)} demo={() => run.demo('replication')} />}
       {tab === 'conclude' && <ConcludeView s={s} running={run.running} run={(sc, p) => { setScenario(sc); run.live(sc, p) }} goCourt={() => setTab('court')} />}
 
       <footer className="mt-10 rounded-2xl border border-line bg-panel/60 p-4 text-xs leading-relaxed text-mute">

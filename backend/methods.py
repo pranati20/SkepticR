@@ -91,6 +91,7 @@ def _topic(t: dict) -> dict:
             scored.append((LIT._live_relevance(p, terms), p))
     scored.sort(key=lambda x: (-x[0], -(x[1].get("cited_by") or 0)))
     for rel, p in [x for x in scored if x[0] >= 2][:3]:
+        p = {**p, "abstract": LIT.enrich_abstract(p)}
         aid = _arxiv_id(p.get("url"), p.get("doi"))
         eq = equations(aid) if aid else []
         note = "" if eq else ("No readable full text with equations was available: open the paper." if aid
@@ -121,11 +122,7 @@ def research() -> dict:
     data = {"topics": topics}
     if any(t["papers"] for t in topics):
         _CACHE.update(t=now, data=data)
-    try:
-        from . import library
-        library.record([{**p, "kind": "paper"} for t in topics for p in t["papers"]], "method research: improving our algorithms")
-    except Exception:  # noqa: BLE001
-        pass
+
     return data
 
 

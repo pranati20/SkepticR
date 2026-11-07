@@ -57,14 +57,32 @@ def record(items: list[dict], context: str) -> None:
 def entries() -> list[dict]:
     """Newest first. Each entry carries `used`: paragraphs saying what was taken from the paper and for what. Entries saved before
     this was tracked get one derived from their stored abstract snippet and the question they were looked up for."""
-    from .literature import used_paragraph
+    from .literature import enrich_abstract, used_paragraph
+    allv = _load()
+    missing = [e for e in allv.values() if not e.get("snippet") and e.get("kind", "paper") == "paper" and (e.get("url") or e.get("title")) and not e.get("abs_tried")]
+    if missing:                                           # one-time back-fill of real abstracts for papers saved without one
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(6) as ex:
+            got = list(ex.map(lambda e: enrich_abstract({"title": e["title"], "url": e.get("url"), "abstract": ""}, 6.0), missing[:20]))
+        with _LOCK:
+            lib = _load()
+            for e, a in zip(missing[:20], got):
+                for k, v in lib.items():
+                    if v["title"] == e["title"]:
+                        v["abs_tried"] = True
+                        if a:
+                            v["snippet"] = a[:300]
+            try:
+                _path().write_text(json.dumps(lib), encoding="utf-8")
+            except OSError:
+                pass
     out = []
     for e in sorted(_load().values(), key=lambda e: -e["last_seen"]):
-        used = [u["text"] for u in e.get("used_list", [])]
+        used = [u["text"] for u in e.get("used_list", []) if "What the paper says" in u["text"] or not e.get("snippet")]
         if not used:
             ctx = (e.get("contexts") or [""])[-1]
             used = [used_paragraph({"title": e["title"], "abstract": e.get("snippet", "")},
-                                   f"answering: {ctx or 'a question you asked'}" if e.get("kind") == "paper" else f"finding data for: {ctx}",
+                                   (f"{ctx or 'a question you asked'}" if e.get("kind") == "paper" else f"finding data for: {ctx}"),
                                    [w for w in ctx.lower().split() if len(w) > 3])]
         out.append({**e, "used": used[-3:]})
     return out

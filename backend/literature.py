@@ -227,6 +227,7 @@ class Librarian:
             on_topic = [p for p in live if any(f in (p["title"] + " " + (p.get("abstract") or "")).lower() for f in _FIN)]
             ranked = sorted(((_live_relevance(p, terms), p) for p in on_topic), key=lambda x: (-x[0], -(x[1].get("cited_by") or 0)))   # ties: more-cited first
             for rel, p in [x for x in ranked if x[0] >= 2][:top]:
+                p = {**p, "abstract": enrich_abstract(p)}
                 found.append({**p, "id": p.get("doi") or p["url"], "claim": (p.get("abstract") or "")[:240] or "(no abstract returned: open the link)",
                               "sample": None, "universe": None, "relevance": round(rel, 1), **assess_live(p, self.scenario)})
                 found[-1]["used"] = used_paragraph(p, self._use_text(found[-1]), terms)
@@ -328,6 +329,7 @@ def methods_scout(online: bool = True, per_attack: int = 2) -> dict:
         try:
             found = []
             for p in openalex(q, 10):
+                p = {**p, "abstract": enrich_abstract(p)}
                 chk = validate_method_paper(p, must)
                 if chk:
                     found.append({k: p.get(k) for k in ("title", "authors", "year", "venue", "url", "doi", "cited_by", "source")} | {"checks": chk}
@@ -358,6 +360,30 @@ METHOD_USE = {
 _STOP = {"the", "and", "for", "with", "that", "this", "from", "are", "was", "were", "its", "into", "our", "than", "have", "has"}
 
 
+def enrich_abstract(p: dict, timeout: float = 8.0) -> str:
+    """Crossref often returns no abstract. Look the paper up in OpenAlex (by DOI, else by exact title) and return its REAL abstract, or ''."""
+    if (p.get("abstract") or "").strip():
+        return p["abstract"]
+    doi = (p.get("doi") or p.get("url") or "")
+    m = re.search(r"10\.\d{4,9}/\S+", doi)
+    title = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", p.get("title") or "")).strip()
+    key = os.environ.get("OPENALEX_API_KEY")
+    kq = {"api_key": key} if key else {}
+
+    def fetch():
+        if m:
+            url = f"https://api.openalex.org/works/doi:{urllib.parse.quote(m.group(0), safe='/')}?" + urllib.parse.urlencode({**kq, "select": "abstract_inverted_index"})
+            return _abstract(json.loads(_get(url, timeout).decode()).get("abstract_inverted_index"))[:1500]
+        url = "https://api.openalex.org/works?" + urllib.parse.urlencode({**kq, "search": title, "per-page": 1, "select": "title,abstract_inverted_index"})
+        rs = json.loads(_get(url, timeout).decode())["results"]
+        same = rs and re.sub(r"\W+", "", (rs[0].get("title") or "").lower()) == re.sub(r"\W+", "", title.lower())
+        return _abstract(rs[0].get("abstract_inverted_index"))[:1500] if same else ""
+    try:
+        return _cached("abstract", (m.group(0) if m else title), fetch)
+    except Exception:  # noqa: BLE001  network down / not found: the paragraph will say no abstract was available
+        return ""
+
+
 def _quote(p: dict, terms: list[str]) -> str:
     """The sentence of the paper's own abstract that best matches what we used it for (verbatim, trimmed)."""
     abst = (p.get("abstract") or "").strip()
@@ -367,12 +393,13 @@ def _quote(p: dict, terms: list[str]) -> str:
     if not sents:
         return abst[:220]
     terms = [t for t in terms if t not in _STOP and len(t) > 3]
-    best = max(sents, key=lambda s: sum(t in s.lower() for t in terms))
-    return best[:240] + ("..." if len(best) > 240 else "")
+    ranked = sorted(range(len(sents)), key=lambda i: (-sum(t in sents[i].lower() for t in terms), i))[:2]
+    text = " ".join(sents[i] for i in sorted(ranked))                  # the two best-matching sentences, in the paper's own order
+    return text[:420] + ("..." if len(text) > 420 else "")
 
 
 def used_paragraph(p: dict, use: str, terms: list[str] | None = None) -> str:
     """A short, honest paragraph: what part of the paper was used, and for what. We only read the abstract and metadata, never the full text."""
     q = _quote(p, terms or _terms(use))
-    src = f'From its abstract: "{q}" ' if q else "No abstract was returned, so only the title, year and venue were used. "
-    return f"{src}Used for {use}. (We read the abstract only, not the full text.)"
+    src = f'What the paper says (its abstract): "{q}" ' if q else "No abstract could be retrieved for this paper, so only its title, year and venue were used. "
+    return f"{src}How we use it: {use}. (We read the abstract only, not the full text.)"
