@@ -1,0 +1,13 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: dark; }
+html, body, #root { min-height: 100%; }
+body { background: radial-gradient(1200px 600px at 15% -10%, #12203a 0%, #080b12 55%); }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #1e2a3d; border-radius: 8px; }
+.card { @apply rounded-2xl border border-line bg-panel/80 backdrop-blur-sm; }
+.h-label { @apply text-[11px] uppercase tracking-[0.14em] text-mute font-medium; }
+.btn { @apply rounded-lg border border-line bg-panel2 px-3 py-1.5 text-sm text-slate-200 transition hover:border-accent/60 hover:text-white disabled:opacity-40; }
+.btn-primary { @apply rounded-lg bg-accent/90 px-3 py-1.5 text-sm font-semibold text-ink transition hover:bg-accent disabled:opacity-40; }

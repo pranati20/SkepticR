@@ -150,6 +150,39 @@ def upload(body: dict):
             "preview": json.loads(df.head(5).to_json(orient="records"))}
 
 
+_NULLLAB: dict = {}
+
+
+@app.post("/api/nullrerun")
+def null_rerun(body: dict):
+    """Re-run the null-world audit on the synthetic benchmark with a chosen number of worlds (the UI's live slider)."""
+    import time
+    import numpy as np
+    from .adapters.synthetic import SynthConfig, generate
+    from .court import null_worlds as NW, stats as S
+    n = int(max(50, min(2000, body.get("n_worlds", 300))))
+    if "data" not in _NULLLAB:
+        _NULLLAB["data"] = generate(SynthConfig(seed=int(body.get("seed", 0))))
+    d = _NULLLAB["data"]
+    t0 = time.time()
+    r = NW.run_null_worlds(d.pnl, d.factors, S.raw_t, "stationary_bootstrap", n, seed=7)
+    obs = np.abs(r.observed)
+    planted = [i for i in range(len(d.meta)) if d.meta[i]["kind"] == "planted"]
+    hi = float(max(r.null_max.max(), obs[planted].max())) * 1.05
+    counts, edges = np.histogram(r.null_max, bins=30, range=(0, hi))
+    return _clean({"n_worlds": n, "seconds": time.time() - t0,
+                   "histogram": {"counts": counts.tolist(), "edges": edges.tolist(), "p95": float(np.quantile(r.null_max, 0.95))},
+                   "planted": [{"id": d.meta[i]["id"], "stat": float(obs[i]), "p_adj": float(r.p_stepdown[i])} for i in planted]})
+
+
+@app.get("/api/sample/health")
+def sample_health():
+    from fastapi.responses import PlainTextResponse
+    from .adapters.claims_data import health_supplement
+    df = health_supplement(1, 4000).df.drop(columns=["enrolled"])
+    return PlainTextResponse(df.to_csv(index=False))
+
+
 @app.get("/api/health")
 def health():
     return {"ok": True, "frontend": DIST.exists()}

@@ -238,12 +238,12 @@
   },
   "SKEPTIC (full court)": {
    "claimed": {
-    "mean": 4.0,
-    "ci95": 0.3762082290154581
+    "mean": 3.95,
+    "ci95": 0.38876295036814823
    },
    "tp": {
-    "mean": 4.0,
-    "ci95": 0.3762082290154581
+    "mean": 3.95,
+    "ci95": 0.38876295036814823
    },
    "fp": {
     "mean": 0.0,
@@ -254,8 +254,8 @@
     "ci95": 0.0
    },
    "recall": {
-    "mean": 0.8,
-    "ci95": 0.07524164580309162
+    "mean": 0.7900000000000001,
+    "ci95": 0.07775259007362965
    },
    "fdr": {
     "mean": 0.0,
@@ -337,7 +337,7 @@
    },
    {
     "sr": 2.6862500000000002,
-    "detect": 0.90625,
+    "detect": 0.875,
     "n": 32
    },
    {
@@ -484,17 +484,17 @@
   ]
  },
  "verdict_totals_per_run": {
-  "DISCOVERY": 4.0,
-  "CAN'T TELL YET": 1.35,
-  "LUCK": 494.65
+  "CAN'T TELL YET": 1.4,
+  "LUCK": 494.65,
+  "DISCOVERY": 3.95
  },
  "real_signals_called_luck_per_run": 0.85,
- "real_signals_cant_tell_per_run": 0.15,
+ "real_signals_cant_tell_per_run": 0.2,
  "failure_modes": [
   {
    "title": "Hidden confounders pass",
    "detail": "If a decoy loads on a factor the Prosecutor is not given (here VAL and MOM withheld), the confounder attack cannot see it. Skeptic only controls for factors it knows about.",
-   "metric": "6 of 10 decoys declared DISCOVERY when VAL and MOM are hidden (vs 0 with full factors)"
+   "metric": "5 of 10 decoys declared DISCOVERY when VAL and MOM are hidden (vs 0 with full factors)"
   },
   {
    "title": "Weak real effects look like luck",
@@ -533,5 +533,5 @@
    3.5
   ]
  },
- "runtime_s": 338.4084322452545
+ "runtime_s": 235.6130726337433
 }
