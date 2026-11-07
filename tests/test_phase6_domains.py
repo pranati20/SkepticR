@@ -72,3 +72,13 @@ def test_every_paper_says_what_was_used_from_it():
     u = L.used_paragraph(p, L.METHOD_USE["survivorship"], ["survivorship"])
     assert "survivorship bias inflates" in u and "Survivorship Prosecutor" in u and "abstract only" in u
     assert "No abstract" in L.used_paragraph({"title": "t"}, "x")
+
+
+def test_papers_tab_entries_say_what_was_used(tmp_path, monkeypatch):
+    monkeypatch.setenv("SKEPTIC_LIBRARY_PATH", str(tmp_path / "p.json"))
+    from skeptic.backend import library as LB
+    LB.record([{"title": "A", "url": "u1", "abstract": "We study survivorship bias in returns and show it matters a great deal.", "used": "Used for X."}], "ctx1")
+    LB.record([{"title": "B", "url": "u2", "abstract": "Plain abstract about sequential testing and stopping rules in trials."}], "peeking question")
+    es = {e["title"]: e for e in LB.entries()}
+    assert es["A"]["used"] == ["Used for X."]
+    assert "peeking question" in es["B"]["used"][0] and "abstract only" in es["B"]["used"][0]

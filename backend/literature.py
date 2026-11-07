@@ -334,6 +334,11 @@ def methods_scout(online: bool = True, per_attack: int = 2) -> dict:
                              | {"used": used_paragraph(p, METHOD_USE.get(area, "a Prosecutor check"), list(must))})
             found.sort(key=lambda x: -(x["cited_by"] or 0))
             out[area] = found[:per_attack]
+            try:
+                from . import library
+                library.record([{**p, "kind": "paper"} for p in out[area]], f"Methods scout: {area}")
+            except Exception:  # noqa: BLE001  bookkeeping only
+                pass
             status.append(f"{area}: {len(out[area])} validated of 10 returned")
         except Exception as e:  # noqa: BLE001
             status.append(f"{area}: OpenAlex unavailable ({str(e)[:50] or type(e).__name__})")

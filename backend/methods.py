@@ -101,6 +101,11 @@ def _topic(t: dict) -> dict:
     from .literature import used_paragraph
     for p in papers:
         p["used"] = used_paragraph(p, f"strengthening Skeptic's {t['component']}", t["title"].lower().split())
+    try:
+        from . import library
+        library.record([{**p, "kind": "paper"} for p in papers], f"Improve the algorithm: {t['component']}")
+    except Exception:  # noqa: BLE001  bookkeeping only
+        pass
     return {"id": t["id"], "title": t["title"], "component": t["component"], "papers": papers, "status": notes}
 
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 
-type Entry = { title: string; authors: string; year: number | string | null; venue: string; url: string | null; source: string; kind: string; snippet: string; uses: number; contexts: string[]; last_seen: number }
+type Entry = { title: string; authors: string; year: number | string | null; venue: string; url: string | null; source: string; kind: string; snippet: string; uses: number; contexts: string[]; used?: string[]; last_seen: number }
 
 const ago = (t: number) => { const s = Math.max(1, Math.round(Date.now() / 1000 - t)); return s < 90 ? `${s}s ago` : s < 5400 ? `${Math.round(s / 60)} min ago` : s < 129600 ? `${Math.round(s / 3600)} h ago` : `${Math.round(s / 86400)} d ago` }
 
@@ -36,7 +36,7 @@ export default function PapersView() {
               <div className="min-w-0 flex-1">
                 {e.url ? <a href={e.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-sky-300 hover:underline">{e.title}</a> : <span className="text-sm font-medium">{e.title}</span>}
                 <div className="text-[11px] text-mute">{[e.authors, e.year, e.venue].filter(Boolean).join(' · ')} · {e.source}</div>
-                {e.snippet && <div className="mt-1 line-clamp-2 text-xs text-slate-400">{e.snippet}</div>}
+                {e.used?.map((u, i) => <div key={i} className="mt-1 rounded border-l-2 border-accent/60 bg-ink/50 px-2 py-1 text-[11px] leading-snug text-slate-300"><b className="text-accent">What we used:</b> {u}</div>)}
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {e.contexts.map((c, i) => <span key={i} className="rounded-full border border-line bg-panel2 px-2 py-0.5 text-[10px] text-slate-300">{c}</span>)}
                 </div>

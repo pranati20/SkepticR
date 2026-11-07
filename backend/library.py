@@ -41,6 +41,8 @@ def record(items: list[dict], context: str) -> None:
                       "last_seen": now})
             e["uses"] += 1
             ctx = context[:120]
+            if it.get("used"):
+                e["used_list"] = [u for u in e.get("used_list", []) if u["context"] != ctx][-5:] + [{"context": ctx, "text": it["used"]}]
             if ctx not in e["contexts"]:
                 e["contexts"] = (e["contexts"] + [ctx])[-8:]
             lib[key] = e
@@ -53,4 +55,16 @@ def record(items: list[dict], context: str) -> None:
 
 
 def entries() -> list[dict]:
-    return sorted(_load().values(), key=lambda e: -e["last_seen"])
+    """Newest first. Each entry carries `used`: paragraphs saying what was taken from the paper and for what. Entries saved before
+    this was tracked get one derived from their stored abstract snippet and the question they were looked up for."""
+    from .literature import used_paragraph
+    out = []
+    for e in sorted(_load().values(), key=lambda e: -e["last_seen"]):
+        used = [u["text"] for u in e.get("used_list", [])]
+        if not used:
+            ctx = (e.get("contexts") or [""])[-1]
+            used = [used_paragraph({"title": e["title"], "abstract": e.get("snippet", "")},
+                                   f"answering: {ctx or 'a question you asked'}" if e.get("kind") == "paper" else f"finding data for: {ctx}",
+                                   [w for w in ctx.lower().split() if len(w) > 3])]
+        out.append({**e, "used": used[-3:]})
+    return out
