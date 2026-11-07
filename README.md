@@ -12,6 +12,34 @@ The core insight: the more ideas an agent tries, the more certain it is that som
 * Backtests are not forecasts. **No trading advice.** Simulated data is labelled as a stand-in everywhere.
 * Known methods, cited: White's Reality Check, Hansen's SPA, Deflated Sharpe Ratio (Bailey & Lopez de Prado), Benjamini-Hochberg, Romano-Wolf step-down, Foster & Stine alpha-investing. Our contribution is applying them to an autonomous agent's own search as one integrated, measurable system.
 
+## Team setup (start here)
+The code imports itself as the package `skeptic`, so the repo folder **must be named `skeptic`** and commands are run from its **parent** folder.
+
+```bash
+# 1. Clone into a parent folder, naming the clone "skeptic"
+mkdir whack && cd whack
+git clone https://github.com/pranati20/SkepticR.git skeptic
+
+# 2. Backend (Python 3.12 recommended)
+python -m venv .venv
+.venv\Scriptsctivate            # Windows PowerShell   (macOS/Linux: source .venv/bin/activate)
+pip install -r skeptic/requirements.txt
+
+# 3. Run the app (UI is pre-built and committed in skeptic/frontend/dist)
+python -m uvicorn skeptic.backend.app:app --port 8000
+#    -> open http://localhost:8000
+
+# 4. Optional: frontend dev mode with hot reload (second terminal, backend still running)
+cd skeptic/frontend
+npm install
+npm run dev                         # -> http://localhost:5173 (proxies /api and /ws to :8000)
+npm run build                       # rebuild frontend/dist, then commit it
+
+# 5. Tests (from the parent "whack" folder)
+python -m pytest skeptic/tests -q
+```
+Working together: create a branch per change (`git checkout -b my-change`), and run `npm run build` and commit `frontend/dist` if you touched the frontend. No API key is needed; see below for real Claude.
+
 ## Run it (offline, no API key)
 ```bash
 pip install -r skeptic/requirements.txt

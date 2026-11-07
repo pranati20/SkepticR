@@ -2,7 +2,6 @@ __pycache__/
 *.pyc
 .pytest_cache/
 node_modules/
-dist/
 *.sqlite
 .llm_cache/
 results/
