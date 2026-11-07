@@ -117,3 +117,14 @@ def test_librarian_live_uses_only_api_results(monkeypatch):
 def test_librarian_offline_has_no_live_papers():
     lib = LIT.Librarian(LIT.Scenario(), online=False)
     assert all(p["source"].startswith("curated index") for p in lib.find("momentum winners", "momentum"))
+
+
+def test_dotenv_loader(tmp_path, monkeypatch):
+    import importlib
+    import skeptic.backend as B
+    monkeypatch.delenv("SKEPTIC_TEST_KEY", raising=False)
+    monkeypatch.setattr(B, "__file__", str(tmp_path / "backend" / "__init__.py"))
+    (tmp_path / ".env").write_text("# c\nSKEPTIC_TEST_KEY=abc\nEMPTY=\n", encoding="utf-8")
+    B._load_dotenv()
+    assert os.environ["SKEPTIC_TEST_KEY"] == "abc" and "EMPTY" not in os.environ
+    monkeypatch.delenv("SKEPTIC_TEST_KEY", raising=False)

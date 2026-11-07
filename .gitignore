@@ -5,3 +5,4 @@ node_modules/
 *.sqlite
 .llm_cache/
 results/
+.env
