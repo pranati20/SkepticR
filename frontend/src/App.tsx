@@ -24,7 +24,10 @@ const TABS = [
 export default function App() {
   const [s, dispatch] = useReducer(reduce, undefined, initialState)
   const run = useRun(dispatch)
-  const [tab, setTab] = useState<(typeof TABS)[number][0]>('conclude')
+  type Tab = (typeof TABS)[number][0]
+  const [tab, setTab] = useState<Tab>('conclude')
+  const [seen, setSeen] = useState<Set<Tab>>(() => new Set<Tab>(['conclude']))
+  const open = (t: Tab) => { setSeen((p) => (p.has(t) ? p : new Set(p).add(t))); setTab(t) }
   const [scenario, setScenario] = useState('market')
   const [mode, setMode] = useState<'demo' | 'live'>('demo')
   const [chatCtx, setChatCtx] = useState<{ question: string; papers: any[] } | null>(null)
@@ -37,23 +40,28 @@ export default function App() {
   const auditFromChat = (question: string, sources: any[]) => {
     const ctx = { question, papers: sources.filter((s) => s.kind === 'paper') }
     const sc = pickScenario(question + ' ' + ctx.papers.map((p) => p.title).join(' '))
-    setChatCtx(ctx); setScenario(sc); setMode('live'); setTab('court')
+    setChatCtx(ctx); setScenario(sc); setMode('live'); open('court')
     run.live(sc, { context: ctx })
   }
   const showControls = tab === 'court' || tab === 'split'
   return (
     <div className="mx-auto max-w-[1500px] px-4 pb-16 pt-4">
-      <header className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-2">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">⚖️ Skeptic</h1>
-          <div className="-mt-0.5 text-xs text-mute">checks whether a pattern in data is real, or just luck</div>
+      <header className="mb-5 flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-line/70 pb-4">
+        <div className="flex items-center gap-3">
+          {/* LOGO SLOT: replace this placeholder <div> with your logo, e.g. <img src="/logo.svg" alt="SkepticR" className="h-10 w-10" /> (put the file in frontend/public) */}
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-dashed border-gold/50 bg-panel2 text-[9px] font-medium uppercase tracking-wider text-gold/70">logo</div>
+          <div>
+            <h1 className="font-display text-[26px] font-bold leading-none tracking-tight text-white">Skeptic<span className="text-gold">R</span></h1>
+            <div className="mt-1 text-[11px] font-medium uppercase tracking-[0.16em] text-mute">signal or luck · statistical audit</div>
+          </div>
         </div>
-        <nav className="flex flex-wrap gap-1 rounded-xl border border-line bg-panel p-1">
+        <nav className="flex flex-wrap gap-1 rounded-xl border border-line bg-panel/90 p-1">
           {TABS.map(([id, label]) => (
-            <button key={id} onClick={() => setTab(id)} className={`rounded-lg px-3 py-1.5 text-sm transition ${tab === id ? 'bg-accent/90 font-semibold text-ink' : 'text-slate-300 hover:text-white'}`}>{label}</button>
+            <button key={id} onClick={() => open(id)} className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${tab === id ? 'bg-accent text-ink shadow-sm' : 'text-slate-300 hover:bg-panel2 hover:text-white'}`}>{label}</button>
           ))}
+          {run.running && tab !== 'conclude' && tab !== 'court' && <span className="flex items-center gap-1.5 px-2 text-xs text-accent"><span className="h-1.5 w-1.5 animate-pulseGlow rounded-full bg-accent" />running…</span>}
         </nav>
-        <div className="ml-auto flex items-center gap-3 text-xs text-mute">{run.source || ''}
+        <div className="ml-auto flex items-center gap-3 font-mono text-xs text-mute">{run.source || ''}
           {s.done && run.last && s.proposals.length > 0 && (
             <a className="btn-primary" href={`/api/report?${run.last.run ? 'run=' + run.last.run : 'demo=' + run.last.demo}`} download>⬇ Export report (PDF)</a>
           )}</div>
@@ -91,12 +99,13 @@ export default function App() {
         </div>
       )}
 
-      <div hidden={tab !== 'ask'}><ChatView onAudit={auditFromChat} /></div>
-      {tab === 'court' && <CourtView s={s} />}
-      {tab === 'methods' && <MethodsView />}
-      {tab === 'split' && <SplitView s={s} />}
-      {tab === 'papers' && <PapersView />}
-      {tab === 'conclude' && <ConcludeView s={s} running={run.running} run={(sc, p) => { setScenario(sc); run.live(sc, p) }} goCourt={() => setTab('court')} />}
+      {/* Tabs stay mounted once opened, so switching tabs never loses a form, an upload or an in-progress search. */}
+      {seen.has('ask') && <div hidden={tab !== 'ask'}><ChatView onAudit={auditFromChat} /></div>}
+      {seen.has('court') && <div hidden={tab !== 'court'}><CourtView s={s} /></div>}
+      {seen.has('methods') && <div hidden={tab !== 'methods'}><MethodsView /></div>}
+      {seen.has('split') && <div hidden={tab !== 'split'}><SplitView s={s} /></div>}
+      {seen.has('papers') && <div hidden={tab !== 'papers'}><PapersView active={tab === 'papers'} /></div>}
+      <div hidden={tab !== 'conclude'}><ConcludeView s={s} running={run.running} run={(sc, p) => { setScenario(sc); run.live(sc, p) }} goCourt={() => open('court')} /></div>
 
       <footer className="mt-10 rounded-2xl border border-line bg-panel/60 p-4 text-xs leading-relaxed text-mute">
         <details><summary className="h-label cursor-pointer">Important limits (click to read)</summary>

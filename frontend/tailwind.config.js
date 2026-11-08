@@ -4,10 +4,10 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: '#080b12', panel: '#0f1520', panel2: '#141c2b', line: '#1e2a3d', mute: '#7d8aa3',
-        disc: '#34d399', luck: '#fb7185', maybe: '#fbbf24', accent: '#38bdf8',
+        ink: '#070a10', panel: '#0d121b', panel2: '#131a26', line: '#243146', mute: '#9ba7bb',
+        disc: '#3ecf8e', luck: '#f16d7f', maybe: '#f2b84b', accent: '#5b9dff', gold: '#d4af6a',
       },
-      fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'Segoe UI', 'sans-serif'], mono: ['JetBrains Mono', 'ui-monospace', 'Consolas', 'monospace'] },
+      fontFamily: { display: ['"Space Grotesk"', 'Inter', 'sans-serif'], sans: ['Inter', 'ui-sans-serif', 'system-ui', 'Segoe UI', 'sans-serif'], mono: ['JetBrains Mono', 'ui-monospace', 'Consolas', 'monospace'] },
       keyframes: { pulseGlow: { '0%,100%': { opacity: 0.55 }, '50%': { opacity: 1 } } },
       animation: { pulseGlow: 'pulseGlow 1.4s ease-in-out infinite' },
     },

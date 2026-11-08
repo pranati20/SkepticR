@@ -33,14 +33,14 @@ function SwarmGraph({ s }: { s: RunState }) {
     <svg viewBox={`0 0 520 ${H}`} className="w-full">
       {edges.map(([a, b], i) => {
         const [x1, y1] = pos[a], [x2, y2] = pos[b]; const on = hot(a) || hot(b)
-        return <line key={i} x1={x1 + 24} y1={y1} x2={x2 - 24} y2={y2} stroke={on ? '#38bdf8' : '#1e2a3d'} strokeWidth={on ? 1.6 : 0.8} opacity={on ? 0.95 : 0.55} />
+        return <line key={i} x1={x1 + 24} y1={y1} x2={x2 - 24} y2={y2} stroke={on ? '#5b9dff' : '#243146'} strokeWidth={on ? 1.6 : 0.8} opacity={on ? 0.95 : 0.55} />
       })}
       {cols.map((c) => c.nodes.map((n) => {
         const [x, y] = pos[n.id]; const on = hot(n.id)
         return (
           <g key={n.id}>
-            <motion.rect x={x - 26} y={y - 9} width={52} height={18} rx={9} fill={on ? '#0c4a6e' : '#0f1520'} stroke={on ? '#38bdf8' : '#2a3a55'} animate={{ opacity: on ? 1 : 0.8 }} />
-            <text x={x} y={y + 3} textAnchor="middle" fontSize="7" fill={on ? '#e0f2fe' : '#94a3b8'}>{n.label.length > 12 ? n.label.slice(0, 11) + '…' : n.label}</text>
+            <motion.rect x={x - 26} y={y - 9} width={52} height={18} rx={9} fill={on ? '#14315f' : '#0d121b'} stroke={on ? '#5b9dff' : '#2a3a55'} animate={{ opacity: on ? 1 : 0.8 }} />
+            <text x={x} y={y + 3} textAnchor="middle" fontSize="7" fill={on ? '#e3edff' : '#94a3b8'}>{n.label.length > 12 ? n.label.slice(0, 11) + '…' : n.label}</text>
           </g>
         )
       }))}
@@ -76,7 +76,7 @@ function TokenMeter({ s }: { s: RunState }) {
       <div className="grid grid-cols-3 gap-3">
         <Stat label="LLM tokens" value={totalTok.toLocaleString()} sub={`${calls} calls`} />
         <Stat label="Cost" value={`$${fmt(t?.total_cost_usd ?? 0, 3)}`} sub="MockLLM = $0" />
-        <Stat label="Zero-token ops" value={stat.toLocaleString()} color="#34d399" sub="null worlds, backtests, attacks" />
+        <Stat label="Zero-token ops" value={stat.toLocaleString()} color="#3ecf8e" sub="null worlds, backtests, attacks" />
       </div>
       <div>
         <div className="mb-1 flex justify-between text-[11px] text-mute"><span>statistics (no tokens)</span><span>LLM calls</span></div>
@@ -102,7 +102,7 @@ function LedgerTicker({ s }: { s: RunState }) {
     <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
       <Stat label="Ideas tried" value={(L.tests || 0).toLocaleString()} sub="every test, every agent" />
       <Stat label="Cleaning choices" value={L.cleaning_choices || 0} sub={`${L.cleaning_paths || 1} forking paths`} />
-      <Stat label="Effective search" value={(L.effective || L.tests || 0).toLocaleString()} color="#38bdf8" sub="what luck must beat" />
+      <Stat label="Effective search" value={(L.effective || L.tests || 0).toLocaleString()} color="#5b9dff" sub="what luck must beat" />
       <Stat label="Agents searching" value={L.agents || 0} sub="10 agents = 10x the luck" />
     </div>
   )
@@ -173,8 +173,8 @@ export function Detail({ s, id }: { s: RunState; id: string }) {
         <div>
           <div className="h-label mb-1">Strategy card · Sharpe {fmt(card.sharpe_gross)} gross / {fmt(card.sharpe_net)} net · deflated {pct(card.deflated_sharpe_prob)} · maxDD {pct(card.max_drawdown_net, 1)}</div>
           <div className="h-36"><ResponsiveContainer><AreaChart data={card.equity_net.map((y: number, i: number) => ({ i, net: y, gross: card.equity_gross[i] }))}>
-            <CartesianGrid stroke="#1e2a3d" /><XAxis dataKey="i" hide /><YAxis width={42} tick={{ fontSize: 10, fill: '#64748b' }} /><Tooltip contentStyle={{ background: '#0f1520', border: '1px solid #1e2a3d' }} />
-            <Area dataKey="gross" stroke="#64748b" fill="#64748b22" /><Area dataKey="net" stroke="#34d399" fill="#34d39922" /></AreaChart></ResponsiveContainer></div>
+            <CartesianGrid stroke="#243146" /><XAxis dataKey="i" hide /><YAxis width={42} tick={{ fontSize: 10, fill: '#64748b' }} /><Tooltip contentStyle={{ background: '#0d121b', border: '1px solid #243146' }} />
+            <Area dataKey="gross" stroke="#64748b" fill="#64748b22" /><Area dataKey="net" stroke="#3ecf8e" fill="#3ecf8e22" /></AreaChart></ResponsiveContainer></div>
           <div className="text-[11px] text-mute">{card.capacity_note} {card.disclaimer}</div>
         </div>
       )}
@@ -191,7 +191,7 @@ export default function CourtView({ s, compact = false }: { s: RunState; compact
   const audit = s.audits[s.audits.length - 1]
   const discs = Object.values(s.verdicts).filter((v: any) => v.verdict === 'DISCOVERY')
   const maybe = Object.values(s.verdicts).filter((v: any) => v.verdict === "CAN'T TELL YET")
-  const topMarks = (audit?.top_observed || []).slice(0, 3).map((t: any) => ({ x: t.stat, label: `best found ${fmt(t.stat, 1)}`, color: '#34d399' }))
+  const topMarks = (audit?.top_observed || []).slice(0, 3).map((t: any) => ({ x: t.stat, label: `best found ${fmt(t.stat, 1)}`, color: '#3ecf8e' }))
   return (
     <div className="space-y-4">
       <IllusionCard s={s} />

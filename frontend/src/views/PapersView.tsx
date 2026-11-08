@@ -4,12 +4,12 @@ type Entry = { title: string; authors: string; year: number | string | null; ven
 
 const ago = (t: number) => { const s = Math.max(1, Math.round(Date.now() / 1000 - t)); return s < 90 ? `${s}s ago` : s < 5400 ? `${Math.round(s / 60)} min ago` : s < 129600 ? `${Math.round(s / 3600)} h ago` : `${Math.round(s / 86400)} d ago` }
 
-export default function PapersView() {
+export default function PapersView({ active = true }: { active?: boolean }) {
   const [d, setD] = useState<{ looked_at: Entry[] } | null>(null)
   const [err, setErr] = useState('')
   const [q, setQ] = useState('')
   const [kind, setKind] = useState<'all' | 'paper' | 'dataset'>('all')
-  useEffect(() => { fetch('/api/library').then((r) => (r.ok ? r.json() : Promise.reject('could not load'))).then(setD).catch((e) => setErr(String(e))) }, [])
+  useEffect(() => { if (!active) return; fetch('/api/library').then((r) => (r.ok ? r.json() : Promise.reject('could not load'))).then(setD).catch((e) => setErr(String(e))) }, [active])
   const rows = useMemo(() => (d?.looked_at || []).filter((e) => (kind === 'all' || e.kind === kind) && (e.title + e.authors + e.contexts.join(' ')).toLowerCase().includes(q.toLowerCase())), [d, q, kind])
   if (err) return <div className="text-sm text-luck">{err}</div>
   if (!d) return <div className="text-mute">loading…</div>

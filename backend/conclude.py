@@ -214,12 +214,11 @@ def conclude(question: str, events: list[dict], llm: LLM | None = None, table=No
                         f"So the data, as it stands, does not support an answer to: \"{question}\". More data or a sharper question may help."}
     llm = llm or LLM()
     if llm.is_mock:
-        lines = [f"Question: {question}", "", "Valid findings (they survived every check):"]
-        for x in fs:
-            lines.append(f"- [{x['ref']}] {x['claim']}" + (f" ({x['direction']})" if x["direction"] else "") + f"; evidence {x['evidence'] * 100:.0f}%, passed {x['checks_passed']} attacks")
-        lines += ["", f"{f['n_luck']} other candidate findings were judged luck or bias and {f['n_unclear']} lacked data; none of them are used here.",
-                  "(No AI model is configured, so this is a plain summary, not a written analysis.)"]
-        return with_answer({**base, "status": "valid", "llm": "offline (no model)", "text": "\n".join(lines)})
+        # the findings themselves are rendered by the UI from `findings`; don't repeat them in the text
+        refs = ", ".join(f"[{x['ref']}]" for x in fs)
+        text = (f"{len(fs)} finding(s) survived every check ({refs}); they are listed below.\n"
+                "(No AI model is configured, so this is a plain summary, not a written analysis.)")
+        return with_answer({**base, "status": "valid", "llm": "offline (no model)", "text": text})
     digest = "\n".join(f"[{x['ref']}] {x['claim']} | direction: {x['direction'] or 'n/a'} | evidence {x['evidence']:.2f} | adjusted p {x['p_adj']:.3g} | "
                        f"power {('%.2f' % x['power']) if x['power'] is not None else 'n/a'} | checks passed {x['checks_passed']}"
                        + (f" | caution flags: {', '.join(x['flags'])}" if x["flags"] else "") for x in fs)

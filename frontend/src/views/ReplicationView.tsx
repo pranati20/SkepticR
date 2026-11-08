@@ -55,10 +55,10 @@ export default function ReplicationView({ s, run, demo, running }: { s: RunState
                 : (<div className="text-sm text-slate-300">{dec.note}<div className="mt-1">Full-sample Sharpe {fmt(dec.sharpe_full)}</div></div>)}
             </div>
             <div className="lg:col-span-2 h-56">
-              {dec.rolling_sharpe && (<ResponsiveContainer><LineChart data={dec.rolling_sharpe.map((y: number, i: number) => ({ i, y }))}><CartesianGrid stroke="#1e2a3d" /><XAxis dataKey="i" hide /><YAxis tick={{ fontSize: 10, fill: '#64748b' }} width={30} />
-                <Tooltip contentStyle={{ background: '#0f1520', border: '1px solid #1e2a3d' }} formatter={(v: any) => fmt(v)} /><ReferenceLine y={0} stroke="#475569" />
-                {dec.pub_index !== undefined && <ReferenceLine x={dec.pub_index} stroke="#fbbf24" strokeDasharray="4 4" label={{ value: 'published', fill: '#fbbf24', fontSize: 10 }} />}
-                <Line dataKey="y" stroke="#38bdf8" strokeWidth={2} dot={false} /></LineChart></ResponsiveContainer>)}
+              {dec.rolling_sharpe && (<ResponsiveContainer><LineChart data={dec.rolling_sharpe.map((y: number, i: number) => ({ i, y }))}><CartesianGrid stroke="#243146" /><XAxis dataKey="i" hide /><YAxis tick={{ fontSize: 10, fill: '#64748b' }} width={30} />
+                <Tooltip contentStyle={{ background: '#0d121b', border: '1px solid #243146' }} formatter={(v: any) => fmt(v)} /><ReferenceLine y={0} stroke="#475569" />
+                {dec.pub_index !== undefined && <ReferenceLine x={dec.pub_index} stroke="#f2b84b" strokeDasharray="4 4" label={{ value: 'published', fill: '#f2b84b', fontSize: 10 }} />}
+                <Line dataKey="y" stroke="#5b9dff" strokeWidth={2} dot={false} /></LineChart></ResponsiveContainer>)}
               <div className="text-[11px] text-mute">Rolling 1-year Sharpe of the as-published construction.</div>
             </div>
           </div>
