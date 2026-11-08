@@ -48,8 +48,8 @@ export default function App() {
     <div className="mx-auto max-w-[1500px] px-4 pb-16 pt-4">
       <header className="mb-5 flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-line/70 pb-4">
         <div className="flex items-center gap-3">
-          {/* LOGO SLOT: replace this placeholder <div> with your logo, e.g. <img src="/logo.svg" alt="SkepticR" className="h-10 w-10" /> (put the file in frontend/public) */}
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-dashed border-gold/50 bg-panel2 text-[9px] font-medium uppercase tracking-wider text-gold/70">logo</div>
+          {/* LOGO: the file is frontend/public/logo.svg (also the browser-tab icon); replace that file to change it */}
+          <img src="/logo.svg" alt="SkepticR logo" className="h-11 w-11 shrink-0 drop-shadow-[0_6px_18px_rgba(212,175,106,0.25)]" />
           <div>
             <h1 className="font-display text-[26px] font-bold leading-none tracking-tight text-white">Skeptic<span className="text-gold">R</span></h1>
             <div className="mt-1 text-[11px] font-medium uppercase tracking-[0.16em] text-mute">signal or luck · statistical audit</div>
