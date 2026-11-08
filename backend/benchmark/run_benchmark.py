@@ -80,12 +80,12 @@ def failure_modes(seed: int = 0) -> list[dict]:
     se.factors, se.factors_hold, se.factor_names = d.factors[:, :2], d.factors_holdout[:, :2], d.factor_names[:2]
     disc, *_ = court_discoveries(se, seed)
     fm.append({"title": "Hidden confounders pass", "detail": "If a decoy loads on a factor the Skeptic is not given (here VAL and MOM withheld), "
-               "the confounder attack cannot see it. Skeptic only controls for factors it knows about.",
+               "the confounder attack cannot see it. SkepticR only controls for factors it knows about.",
                "metric": f"{int((disc & (se.truth == 'beta')).sum())} of 10 decoys declared DISCOVERY when VAL and MOM are hidden "
                          f"(vs {int((court_discoveries(from_synthetic(d, seed), seed)[0] & (se.truth == 'beta')).sum())} with full factors)"})
     # 2. weak real signals are not detectable
     fm.append({"title": "Weak real effects look like luck", "detail": "A real signal needs enough data to stand out from the best result luck can produce in "
-               "a search of this size. Below that, Skeptic says LUCK or CAN'T TELL YET even when the effect is real. See the power curve.",
+               "a search of this size. Below that, SkepticR says LUCK or CAN'T TELL YET even when the effect is real. See the power curve.",
                "metric": "power curve: detection rate vs true Sharpe"})
     # 3. traps rely on spec-level checks in the synthetic benchmark
     fm.append({"title": "Synthetic traps are caught from the spec", "detail": "In the synthetic benchmark leakage and survivorship are flagged in the hypothesis spec. "

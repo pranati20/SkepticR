@@ -159,6 +159,15 @@ def report(run: str = "", demo: str = ""):
     return Response(build_pdf(events), media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="skeptic_tearsheet_{name}.pdf"'})
 
 
+@app.get("/api/benchmark")
+def benchmark():
+    """The recorded synthetic benchmark (ground truth known), as written by backend/benchmark/run_benchmark.py."""
+    f = DEMO / "benchmark.json"
+    if not f.exists():
+        raise HTTPException(404, "no benchmark recorded: python -m skeptic.backend.benchmark.run_benchmark")
+    return JSONResponse(json.loads(f.read_text(encoding="utf-8")))
+
+
 @app.get("/api/demo")
 def demo_list():
     d = DEMO / "runs"

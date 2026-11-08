@@ -210,7 +210,7 @@ def conclude(question: str, events: list[dict], llm: LLM | None = None, table=No
         return {**r, "text": body}
     if not fs:
         why = f"{f['n_luck']} looked like luck or bias and {f['n_unclear']} had too little data to judge"
-        return {**base, "status": "none", "llm": "none", "text": base["answer"] + NL + f"No valid conclusion can be drawn. Skeptic examined {f['n_tested']} possible findings and none survived every check ({why}). "
+        return {**base, "status": "none", "llm": "none", "text": base["answer"] + NL + f"No valid conclusion can be drawn. SkepticR examined {f['n_tested']} possible findings and none survived every check ({why}). "
                         f"So the data, as it stands, does not support an answer to: \"{question}\". More data or a sharper question may help."}
     llm = llm or LLM()
     if llm.is_mock:

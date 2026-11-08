@@ -38,7 +38,7 @@ export default function MethodsView() {
   return (
     <div className="mx-auto max-w-4xl space-y-5">
       <div>
-        <h2 className="text-lg font-semibold">Papers that could make Skeptic’s own math stronger</h2>
+        <h2 className="text-lg font-semibold">Papers that could make SkepticR’s own math stronger</h2>
         <div className="text-sm text-slate-300">Skeptic searches the research literature by itself for the weak points of its own statistics (listed below). You can’t choose the search:
           you only choose how the conclusion is written. Equations are copied from the papers’ own LaTeX, never written by the AI. Where a paper has no readable full text we say so and link it.</div>
       </div>

@@ -12,7 +12,7 @@ export default function SplitView({ s }: { s: RunState }) {
   if (!s.naive) return <Card><div className="text-sm text-mute">Start a run (Replay demo works offline) and this screen fills as the naive analyst announces its “discoveries” and the Court answers them.</div></Card>
   return (
     <div className="space-y-4">
-      {s.meta?.standin && <Banner>Simulated stand-in data with known truth. {s.truth ? `Of the Skeptic survivors, ${s.truth.score.tp} of ${s.truth.score.claimed} match a planted effect.` : ''}</Banner>}
+      {s.meta?.standin && <Banner>Simulated stand-in data with known truth. {s.truth ? `Of the SkepticR survivors, ${s.truth.score.tp} of ${s.truth.score.claimed} match a planted effect.` : ''}</Banner>}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card title="Naive AI analyst (anything with p < 0.05)" className="border-rose-500/20">
           <div className="mb-3 flex items-end gap-3">

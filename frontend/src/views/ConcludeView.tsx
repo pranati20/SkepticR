@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { RunState } from '../state'
 import UploadView from './UploadView'
 import CourtView from './CourtView'
+import { useBenchmark, isNaive, isOurs } from '../benchmark'
 
 const EXAMPLES = [
   'Does the new design increase conversion, and for whom?',
@@ -53,7 +54,40 @@ function Conclusion({ c }: { c: any }) {
   )
 }
 
-export default function ConcludeView({ s, run, running, goCourt }: { s: RunState; run: (scenario: string, params: any) => void; running: boolean; goCourt: () => void }) {
+/** Headline + three numbers from the recorded benchmark (nothing typed in: all read from /api/benchmark). */
+function Hero({ goProof }: { goProof: () => void }) {
+  const { data: d } = useBenchmark()
+  const rows = d ? Object.entries<any>(d.table) : []
+  const naive = rows.find(([n]) => isNaive(n))?.[1]
+  const ours = rows.find(([n]) => isOurs(n))?.[1]
+  const stat = (v: string, label: string, gold = false) => (
+    <div className="border-l border-line pl-4">
+      <div className={`font-mono text-3xl font-semibold tabular-nums ${gold ? 'text-gold' : 'text-white'}`}>{v}</div>
+      <div className="mt-0.5 text-xs leading-snug text-slate-300">{label}</div>
+    </div>
+  )
+  return (
+    <section className="pb-4 pt-6">
+      <div className="h-label mb-3">Statistical audit for AI-driven research</div>
+      <h2 className="text-4xl font-bold leading-[1.1] md:text-5xl">Is it a signal,<br />or is it <span className="text-gold">luck</span>?</h2>
+      <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-slate-300">
+        An AI that tests thousands of ideas will always find one that looks brilliant by chance. SkepticR re-runs the entire search in worlds where nothing is real,
+        puts every survivor on trial, and writes its conclusion only from what is left.
+      </p>
+      {naive && ours && (
+        <div className="mt-6 grid max-w-3xl grid-cols-1 gap-4 sm:grid-cols-3">
+          {stat(`${Math.round(naive.fdr.mean * 100)}%`, 'of a naive analyst’s “discoveries” are false')}
+          {stat(ours.fp.mean.toFixed(1), 'false discoveries per run with SkepticR', true)}
+          {stat(`${Math.round(ours.recall.mean * 100)}%`, 'of the real signals it still finds')}
+        </div>
+      )}
+      {d && <button onClick={goProof} className="mt-4 text-sm font-medium text-blue-300 hover:text-white">
+        Benchmark: {d.setup?.signals} signals, {d.n_seeds} seeds, ground truth known. See the proof →</button>}
+    </section>
+  )
+}
+
+export default function ConcludeView({ s, run, running, goCourt, goProof }: { s: RunState; run: (scenario: string, params: any) => void; running: boolean; goCourt: () => void; goProof: () => void }) {
   const [q, setQ] = useState('')
   const [src, setSrc] = useState<'csv' | 'example'>('example')
   const [ds, setDs] = useState('ab_test')
@@ -61,10 +95,11 @@ export default function ConcludeView({ s, run, running, goCourt }: { s: RunState
   const started = s.meta !== null || running
   return (
     <div className="mx-auto max-w-4xl space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold">What do you want to conclude from your data?</h2>
+      <Hero goProof={goProof} />
+      <div className="pt-2">
+        <h2 className="text-lg font-semibold">Try it: what do you want to conclude from your data?</h2>
         <div className="text-sm text-slate-300">
-          1. Say what you want to find out. 2. Give it data. 3. Skeptic tests every possible finding and throws out the ones that are just luck or bias.
+          1. Say what you want to find out. 2. Give it data. 3. SkepticR tests every possible finding and throws out the ones that are just luck or bias.
           4. The conclusion is written <b>only from what survived</b>.
         </div>
       </div>

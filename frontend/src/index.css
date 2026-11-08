@@ -11,7 +11,12 @@ h1, h2, h3 { @apply font-display tracking-tight text-white; }
 ::-webkit-scrollbar-thumb { background: #22304d; border-radius: 8px; }
 ::selection { background: rgba(59, 130, 246, 0.35); }
 
-.card { @apply rounded-lg border border-line bg-panel; }
+.card { @apply rounded-lg border border-line bg-panel/90 backdrop-blur-[2px]; }
+
+/* the gold "real signal" in the page background draws itself in once on load */
+.backdrop-draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: backdrop-draw 3.2s ease-out 0.3s forwards; }
+@keyframes backdrop-draw { to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) { .backdrop-draw { animation: none; stroke-dashoffset: 0; } }
 .h-label { @apply text-[11px] font-semibold uppercase tracking-[0.14em] text-gold; }
 .btn { @apply rounded-md border border-line bg-transparent px-3 py-1.5 text-sm text-slate-200 transition-colors hover:border-accent hover:text-white disabled:opacity-40; }
 .btn-primary { @apply rounded-md bg-accent px-3.5 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-500 disabled:opacity-40; }

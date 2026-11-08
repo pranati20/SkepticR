@@ -7,6 +7,8 @@ import PapersView from './views/PapersView'
 import ChatView from './views/ChatView'
 import MethodsView from './views/MethodsView'
 import ConcludeView from './views/ConcludeView'
+import ProofView from './views/ProofView'
+import Backdrop from './Backdrop'
 
 const SCENARIOS = [
   { id: 'market', label: 'Stock-picking AI (simulated stocks)' },
@@ -17,8 +19,8 @@ const SCENARIOS = [
   { id: 'ab_test', label: 'A/B test (peeking trap)' },
 ]
 const TABS = [
-  ['conclude', 'Find a conclusion'], ['ask', 'Find papers & data'], ['court', 'Watch it work'],
-  ['split', 'AI vs Skeptic'], ['methods', 'Improve the algorithm'], ['papers', 'Papers it used'],
+  ['conclude', 'Find a conclusion'], ['court', 'Watch it work'], ['split', 'AI vs SkepticR'], ['proof', 'Proof'],
+  ['ask', 'Find papers & data'], ['methods', 'Improve the algorithm'], ['papers', 'Papers it used'],
 ] as const
 
 export default function App() {
@@ -46,6 +48,7 @@ export default function App() {
   const showControls = tab === 'court' || tab === 'split'
   return (
     <div className="mx-auto max-w-[1500px] px-4 pb-16 pt-4">
+      <Backdrop />
       <header className="mb-6 border-b border-line">
        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pb-4 pt-2">
         <div className="flex items-center gap-3">
@@ -106,10 +109,11 @@ export default function App() {
       {seen.has('court') && <div hidden={tab !== 'court'}><CourtView s={s} /></div>}
       {seen.has('methods') && <div hidden={tab !== 'methods'}><MethodsView /></div>}
       {seen.has('split') && <div hidden={tab !== 'split'}><SplitView s={s} /></div>}
+      {seen.has('proof') && <div hidden={tab !== 'proof'}><ProofView /></div>}
       {seen.has('papers') && <div hidden={tab !== 'papers'}><PapersView active={tab === 'papers'} /></div>}
-      <div hidden={tab !== 'conclude'}><ConcludeView s={s} running={run.running} run={(sc, p) => { setScenario(sc); run.live(sc, p) }} goCourt={() => open('court')} /></div>
+      <div hidden={tab !== 'conclude'}><ConcludeView s={s} running={run.running} run={(sc, p) => { setScenario(sc); run.live(sc, p) }} goCourt={() => open('court')} goProof={() => open('proof')} /></div>
 
-      <footer className="mt-10 rounded-2xl border border-line bg-panel/60 p-4 text-xs leading-relaxed text-mute">
+      <footer className="card mt-10 p-4 text-xs leading-relaxed text-mute">
         <details><summary className="h-label cursor-pointer">Important limits (click to read)</summary>
         <ul className="mt-1 list-disc space-y-0.5 pl-4">
           <li>Skeptic reduces false discoveries and quantifies uncertainty. It does not prove truth.</li>

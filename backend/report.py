@@ -54,9 +54,9 @@ def build_pdf(events: list[dict]) -> bytes:
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=15 * mm, rightMargin=15 * mm, topMargin=10 * mm, bottomMargin=10 * mm,
-                            title=f"Skeptic tear sheet: {meta.get('title', 'run')}", author="Skeptic")
+                            title=f"SkepticR tear sheet: {meta.get('title', 'run')}", author="SkepticR")
     f = []
-    f.append(Paragraph("Skeptic - Strategy Tear Sheet", H1))
+    f.append(Paragraph("SkepticR - Strategy Tear Sheet", H1))
     f.append(Paragraph(f"{_t(meta.get('title', 'Run'), 90)} &nbsp;|&nbsp; generated {time.strftime('%Y-%m-%d %H:%M')} &nbsp;|&nbsp; "
                        f"{_t(meta.get('blurb', ''), 140)}", S))
 
