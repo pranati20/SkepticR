@@ -41,7 +41,7 @@ Functions: ts_return(x,n) delta(x,n) lag(x,n) rolling_mean/std/sum/max/min(x,n) 
 Operators: + - * / and unary minus. The feature is ranked cross-sectionally each day: long top quintile, short bottom.
 Windows must be integer constants. Do NOT use lead(): it looks into the future."""
 
-SYSTEM = ("You are a quantitative research Hunter. Propose testable hypotheses as JSON only. "
+SYSTEM = ("You are a quantitative Researcher. Propose testable hypotheses as JSON only. "
           "Use only the documented feature DSL. Be diverse. Higher `prior` only for ideas with published support.\n" + DSL_DOC)
 
 
@@ -54,7 +54,7 @@ class Hunter:
 
     @property
     def name(self) -> str:
-        return f"{self.family}-hunter"
+        return f"{self.family}-researcher"
 
     def propose(self, n: int, seen: set[str], round_idx: int = 0, min_prior: float = 0.0) -> tuple[list[dict], int]:
         """Returns (valid hypotheses, number rejected by the DSL validator). `seen` dedupes formula+universe+hold."""

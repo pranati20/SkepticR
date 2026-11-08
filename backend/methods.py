@@ -31,7 +31,7 @@ TOPICS = [
      "query": "reality check superior predictive ability bootstrap data snooping", "must": ["bootstrap", "snooping", "predictive ability", "reality check"]},
     {"id": "dependent_bootstrap", "title": "Resampling dependent time series", "component": "Null generators (block / stationary bootstrap)",
      "query": "stationary bootstrap dependent time series resampling", "must": ["bootstrap"]},
-    {"id": "sequential", "title": "Valid inference when you peek at results", "component": "Peeking Prosecutor (A/B tests)",
+    {"id": "sequential", "title": "Valid inference when you peek at results", "component": "Peeking Skeptic (A/B tests)",
      "query": "always valid p-values sequential testing continuous monitoring", "must": ["sequential", "always valid", "always-valid", "monitoring"]},
 ]
 

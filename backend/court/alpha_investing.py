@@ -55,6 +55,6 @@ class AlphaInvesting:
         return self.wealth < self.min_wealth
 
     def max_ideas_allowed(self, floor_prior: float) -> float:
-        """Selectivity signal for Hunters: as wealth shrinks, the minimum prior they should submit rises."""
+        """Selectivity signal for Researchers: as wealth shrinks, the minimum prior they should submit rises."""
         frac = self.wealth / self.wealth0
         return min(1.0, max(0.0, floor_prior + (1 - frac) * (1 - floor_prior)))

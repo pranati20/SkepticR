@@ -72,7 +72,7 @@ export default function App() {
           {chatCtx && (
             <div className="flex w-full items-start gap-2 rounded-lg border border-accent/40 bg-accent/5 p-2 text-xs text-slate-200">
               <div className="flex-1">
-                <b>Using your chat:</b> “{chatCtx.question.slice(0, 120)}” · {chatCtx.papers.length} paper(s) will be given to the Prosecutors as evidence, and the AI will test the idea types your question mentions.
+                <b>Using your chat:</b> “{chatCtx.question.slice(0, 120)}” · {chatCtx.papers.length} paper(s) will be given to the Skeptics as evidence, and the AI will test the idea types your question mentions.
                 {scenario !== 'market' && scenario !== 'synthetic' && scenario !== 'equities' && <div className="text-amber-300">This example isn’t about stocks, so the papers are shown but not used in the checks.</div>}
                 {mode === 'demo' && <div className="text-amber-300">“Quick replay” ignores your chat. Switch to “Run for real” under Options.</div>}
               </div>

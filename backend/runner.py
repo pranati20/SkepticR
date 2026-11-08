@@ -38,7 +38,7 @@ HONESTY = [
 ]
 
 TITLES = {
-    "market": ("Market swarm (simulated stand-in)", "Six Hunters search for equity patterns; the Court tries to prove each one is luck."),
+    "market": ("Market swarm (simulated stand-in)", "Six Researchers search for equity patterns; the Court tries to prove each one is luck."),
     "equities": ("Real equities (2010-2025)", "The same swarm on real prices of 117 large caps. The universe is survivors only, which is a flaw."),
     "synthetic": ("Planted-signal benchmark", "500 candidate signals; 5 are real, 10 are confounded decoys, 5 are traps. Ground truth is known."),
     "betting": ("Sports betting edge", "Does betting the model's predicted winner make money, and is it skill?"),
@@ -122,9 +122,9 @@ def _families_for(ctx: Ctx, defaults: list[str]) -> list[str]:
     text = (ctx.context["question"] + " " + " ".join(p["title"] for p in ctx.context["papers"])).lower()
     hit = [f for f in defaults if any(w in text for w in _FAMILY_WORDS.get(f, ()))]
     if hit:
-        ctx.emit("agent", agent="Hunters", text=f"From your chat question I will test these idea families: {', '.join(hit)}")
+        ctx.emit("agent", agent="Researchers", text=f"From your chat question I will test these idea families: {', '.join(hit)}")
         return hit
-    ctx.emit("agent", agent="Hunters", text="Your question did not name a specific idea family, so all families are tested")
+    ctx.emit("agent", agent="Researchers", text="Your question did not name a specific idea family, so all families are tested")
     return defaults
 
 
@@ -132,7 +132,7 @@ def _hunt(ctx: Ctx, families: list[str], rounds: int, per: int, fields: set | No
     seen: set[str] = set()
     hyps: list[dict] = []
     for rnd in range(rounds):
-        ctx.emit("agent", agent="Hunters", text=f"Round {rnd+1}/{rounds}: Hunters are proposing hypotheses", round=rnd)
+        ctx.emit("agent", agent="Researchers", text=f"Round {rnd+1}/{rounds}: Researchers are proposing hypotheses", round=rnd)
         for fam in families:
             hu = H.Hunter(fam, ctx.llm, seed=ctx.seed, fields=fields)
             hs, bad = hu.propose(per, seen, rnd)
@@ -178,14 +178,14 @@ def run_synthetic(ctx: Ctx, params: dict) -> dict:
     _meta(ctx, "synthetic", standin=True, setup={"signals": search.K, "planted": 5, "decoys": 10, "traps": 5}, panel={"note": "Simulated; ground truth known."})
     ctx.ledger.record_many(ctx.run_id, [{"agent": h["agent"], "family": h["family"], "hypothesis_id": h["id"], "spec": h["spec"], "seed": ctx.seed,
                                          "status": "proposed"} for h in search.hyps])
-    ctx.emit("agent", agent="Hunters", text=f"{search.K} candidate signals are on the table")
+    ctx.emit("agent", agent="Researchers", text=f"{search.K} candidate signals are on the table")
     _search_ledger_event(ctx)
     _naive(ctx, search, lambda i: search.hyps[i]["description"])
     return _court(ctx, search, params, truth=True, log_tests=False)
 
 
 def _librarian(ctx: Ctx, search: Search):
-    """Librarian: find papers per hypothesis family, check they APPLY to this scenario, hand the evidence to the Prosecutors."""
+    """Librarian: find papers per hypothesis family, check they APPLY to this scenario, hand the evidence to the Skeptics."""
     dates = search.dates
     sc = LIT.Scenario.from_meta(search.meta, dates, n_assets=int(search.meta.get("n_assets", 117 if search.meta.get("survivorship_bias") else 150)))
     lib = LIT.Librarian(sc, online=bool(ctx.online_literature), extra=(ctx.context or {}).get("papers", []))
@@ -236,7 +236,7 @@ def run_betting(ctx: Ctx, params: dict) -> dict:
              round=0)
     ctx.ledger.record_many(ctx.run_id, [{"agent": h["agent"], "family": h["family"], "hypothesis_id": h["id"], "spec": h["spec"], "seed": ctx.seed,
                                          "status": "proposed"} for h in search.hyps])
-    ctx.emit("agent", agent="Hunters", text=f"{search.K} betting rules (sport, side, odds bucket, weekday, month...) are on the table")
+    ctx.emit("agent", agent="Researchers", text=f"{search.K} betting rules (sport, side, odds bucket, weekday, month...) are on the table")
     _search_ledger_event(ctx)
     _naive(ctx, search, lambda i: f"{search.hyps[i]['description']}  (ROI {100*search.pnl[i].sum()/max(1,search.hyps[i]['spec']['n_bets']):+.0f}%)")
     return _court(ctx, search, {**params, "rounds": params.get("rounds", 3)}, truth=False)
@@ -250,7 +250,7 @@ def _tabular(ctx: Ctx, name: str, spec: TB.TabularSpec, params: dict, standin=Tr
                                                               "note": "Simulated data with known truth." if standin else "User-supplied data."})
     ctx.ledger.record_many(ctx.run_id, [{"agent": h["agent"], "family": h["family"], "hypothesis_id": h["id"], "spec": h["spec"], "seed": ctx.seed,
                                          "status": "proposed"} for h in search.hyps])
-    ctx.emit("agent", agent="Hunters", text=f"{search.K} segment/metric effects were examined")
+    ctx.emit("agent", agent="Researchers", text=f"{search.K} segment/metric effects were examined")
     _search_ledger_event(ctx)
     t = search.obs()
     from scipy import stats as st
@@ -355,7 +355,7 @@ def run_replication(ctx: Ctx, params: dict) -> dict:
     variants.append(("held 5 days", base))
     hyps = []
     for i, (lab, f) in enumerate(variants):
-        h = {"id": f"rep_{i}", "family": "replication", "agent": "replication-hunter", "description": f"{obj['name']} ({lab})",
+        h = {"id": f"rep_{i}", "family": "replication", "agent": "replication-researcher", "description": f"{obj['name']} ({lab})",
              "prior": 0.8 if i == 0 else 0.3, "round": 0, "source_paper": obj.get("source"),
              "spec": {"formula": f, "universe": "current_constituents" if real else "point_in_time", "hold": 5 if lab == "held 5 days" else 1,
                       "uses_future_bar": False, "windows": []}}

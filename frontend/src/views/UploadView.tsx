@@ -26,7 +26,7 @@ export default function UploadView({ run, running, goCourt, externalClaim, label
   const toggle = (arr: string[], set: (x: string[]) => void, c: string) => set(arr.includes(c) ? arr.filter((x) => x !== c) : [...arr, c])
   return (
     <div className="space-y-4">
-      <Banner tone="sky">Upload a CSV and describe your claim. It goes through the same Court: your analysis is counted as one search over every subgroup and metric, tested in null worlds (treatment labels permuted, within confounder strata if you name them), then prosecuted. Data stays on this machine; nothing is stored.</Banner>
+      <Banner tone="sky">Upload a CSV and describe your claim. It goes through the same Court: your analysis is counted as one search over every subgroup and metric, tested in null worlds (treatment labels permuted, within confounder strata if you name them), then attacked by the Skeptics. Data stays on this machine; nothing is stored.</Banner>
       <Card title="1 · Your data and claim">
         <div className="flex flex-wrap items-center gap-2">
           <input type="file" accept=".csv,text/csv" onChange={(e) => onFile(e.target.files?.[0])} className="text-sm" />

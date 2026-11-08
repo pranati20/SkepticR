@@ -260,7 +260,7 @@ class Librarian:
     def _use_text(self, f: dict) -> str:
         sc = self.scenario
         hc = f.get("expected_haircut") or 0
-        return (f"the Literature Prosecutor: to check whether this idea is known and whether its published result still applies to your data "
+        return (f"the Literature Skeptic: to check whether this idea is known and whether its published result still applies to your data "
                 f"({sc.start_year}-{sc.end_year}, {sc.universe})" + (f"; it implies an expected {hc:.0%} weaker effect than published" if hc else ""))
 
     def evidence(self, hyp: dict) -> dict:
@@ -320,7 +320,7 @@ def validate_method_paper(p: dict, must: tuple[str, ...], min_cites: int = 30) -
 
 
 def methods_scout(online: bool = True, per_attack: int = 2) -> dict:
-    """OpenAlex search for papers that could sharpen each Prosecutor. Returns {"papers": {area: [paper+checks]}, "status": [...]}.
+    """OpenAlex search for papers that could sharpen each Skeptic. Returns {"papers": {area: [paper+checks]}, "status": [...]}.
     Never fabricates: offline or on failure it returns nothing and says so."""
     out, status = {}, []
     if not online:
@@ -333,7 +333,7 @@ def methods_scout(online: bool = True, per_attack: int = 2) -> dict:
                 chk = validate_method_paper(p, must)
                 if chk:
                     found.append({k: p.get(k) for k in ("title", "authors", "year", "venue", "url", "doi", "cited_by", "source")} | {"checks": chk}
-                             | {"used": used_paragraph(p, METHOD_USE.get(area, "a Prosecutor check"), list(must))})
+                             | {"used": used_paragraph(p, METHOD_USE.get(area, "a Skeptic check"), list(must))})
             found.sort(key=lambda x: -(x["cited_by"] or 0))
             out[area] = found[:per_attack]
             try:
@@ -350,12 +350,12 @@ def methods_scout(online: bool = True, per_attack: int = 2) -> dict:
 # ---------------------------------------------------------------- "what did we use from this paper?"
 METHOD_USE = {
     "multiple testing / data snooping": "the null-world audit: the whole search is re-run in worlds where nothing is real, and each result is compared with the best that luck alone produced",
-    "leakage / lookahead": "the Leakage Prosecutor: it scans a feature for lookahead and checks whether next-day predictive power is implausibly high",
-    "survivorship": "the Survivorship Prosecutor: it re-runs an idea on the universe that existed at the time, including names that later disappeared",
-    "costs / capacity": "the Costs Prosecutor: it re-prices a strategy after realistic trading costs",
-    "factors / beta": "the Confounder Prosecutor: it checks whether an apparent edge is just exposure to known factors",
-    "post-publication decay": "the Literature Prosecutor: it applies a haircut when an effect was published before or inside your sample",
-    "peeking / sequential testing": "the Peeking Prosecutor: it judges an early look against the best result across all looks",
+    "leakage / lookahead": "the Leakage Skeptic: it scans a feature for lookahead and checks whether next-day predictive power is implausibly high",
+    "survivorship": "the Survivorship Skeptic: it re-runs an idea on the universe that existed at the time, including names that later disappeared",
+    "costs / capacity": "the Costs Skeptic: it re-prices a strategy after realistic trading costs",
+    "factors / beta": "the Confounder Skeptic: it checks whether an apparent edge is just exposure to known factors",
+    "post-publication decay": "the Literature Skeptic: it applies a haircut when an effect was published before or inside your sample",
+    "peeking / sequential testing": "the Peeking Skeptic: it judges an early look against the best result across all looks",
 }
 _STOP = {"the", "and", "for", "with", "that", "this", "from", "are", "was", "were", "its", "into", "our", "than", "have", "has"}
 

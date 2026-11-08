@@ -70,7 +70,7 @@ def test_every_paper_says_what_was_used_from_it():
     from skeptic.backend import literature as L
     p = {"title": "t", "abstract": "Background sentence here is long enough to count. We show that survivorship bias inflates average returns materially."}
     u = L.used_paragraph(p, L.METHOD_USE["survivorship"], ["survivorship"])
-    assert "survivorship bias inflates" in u and "Survivorship Prosecutor" in u and "abstract only" in u
+    assert "survivorship bias inflates" in u and "Survivorship Skeptic" in u and "abstract only" in u
     assert "No abstract" in L.used_paragraph({"title": "t"}, "x")
 
 

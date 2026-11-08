@@ -70,7 +70,7 @@ def from_synthetic(d: SynthData, seed: int = 0) -> Search:
     for i, m in enumerate(d.meta):
         lit = rng.random() < 0.2
         hyps.append({"id": m["id"], "family": m["family"], "description": f"{m['family']} signal #{i}",
-                     "prior": 0.8 if lit else 0.3, "agent": f"{m['family']}-hunter",
+                     "prior": 0.8 if lit else 0.3, "agent": f"{m['family']}-researcher",
                      "source_paper": "literature" if lit else None, "spec": dict(m["spec"])})
         truth.append("alpha" if m["kind"] == "planted" else "trap" if m["kind"].startswith("trap")
                      else "beta" if m["kind"] == "decoy" else "null")

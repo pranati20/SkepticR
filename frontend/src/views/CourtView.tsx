@@ -17,7 +17,7 @@ function SwarmGraph({ s }: { s: RunState }) {
   }, [s.prosecutions, s.phase])
   const cols = [
     { x: 40, nodes: [{ id: 'Cleaner', label: 'Cleaner' }, { id: 'Librarian', label: 'Librarian' }] },
-    { x: 150, nodes: (fams.length ? fams : ['hunters']).map((f) => ({ id: `${f}-hunter`, label: f.replace('_', ' ') })) },
+    { x: 150, nodes: (fams.length ? fams : ['researchers']).map((f) => ({ id: `${f}-researcher`, label: f.replace('_', ' ') })) },
     { x: 260, nodes: [{ id: 'Court', label: 'Null worlds' }, { id: 'Credibility', label: 'α-wealth' }] },
     { x: 370, nodes: (usedAttacks.length ? usedAttacks : ['leakage']).map((a) => ({ id: a, label: ATTACK_NAMES[a] || a })) },
     { x: 470, nodes: [{ id: 'Judge', label: 'Judge' }] },
@@ -44,7 +44,7 @@ function SwarmGraph({ s }: { s: RunState }) {
           </g>
         )
       }))}
-      {['LEDGER', 'NULL AUDIT', 'PROSECUTE', 'VERDICT'].map((t, i) => (<text key={t} x={[95, 205, 315, 420][i]} y={H - 4} textAnchor="middle" fontSize="6.5" fill="#475569" letterSpacing="1">{t}</text>))}
+      {['LEDGER', 'NULL AUDIT', 'SKEPTICS', 'VERDICT'].map((t, i) => (<text key={t} x={[95, 205, 315, 420][i]} y={H - 4} textAnchor="middle" fontSize="6.5" fill="#475569" letterSpacing="1">{t}</text>))}
     </svg>
   )
 }
@@ -64,6 +64,8 @@ function Feed({ s }: { s: RunState }) {
 }
 
 // ---------------------------------------------------------------- meters
+// backend LLM role keys -> names shown in the UI
+const ROLE_NAMES: Record<string, string> = { hunter: 'researcher', prosecutor: 'skeptic' }
 function TokenMeter({ s }: { s: RunState }) {
   const t = s.tokens
   const roles = t ? Object.entries(t.by_role) : []
@@ -86,7 +88,7 @@ function TokenMeter({ s }: { s: RunState }) {
       <div className="space-y-1">
         {roles.map(([role, r]: any) => (
           <div key={role} className="flex items-center gap-2 text-xs">
-            <span className="w-20 text-mute">{role}</span>
+            <span className="w-20 text-mute">{ROLE_NAMES[role] || role}</span>
             <div className="h-1.5 flex-1 rounded bg-line"><div className="h-1.5 rounded bg-accent" style={{ width: `${Math.min(100, ((r.tokens_in + r.tokens_out) / Math.max(1, totalTok)) * 100)}%` }} /></div>
             <span className="w-16 text-right font-mono text-slate-400">{(r.tokens_in + r.tokens_out).toLocaleString()}</span>
           </div>
@@ -141,7 +143,7 @@ export function Detail({ s, id }: { s: RunState; id: string }) {
         </div>
       )}
       <div>
-        <div className="h-label mb-2">Prosecutor results</div>
+        <div className="h-label mb-2">Skeptic results</div>
         <div className="space-y-1.5">
           {attacks.map((a: any, i: number) => (
             <details key={i} className="rounded-lg border border-line bg-panel2/60 px-3 py-2">
@@ -154,7 +156,7 @@ export function Detail({ s, id }: { s: RunState; id: string }) {
               <pre className="mt-2 max-h-52 overflow-auto whitespace-pre-wrap break-words text-[11px] text-slate-400">{JSON.stringify(a.evidence, (k, x) => (typeof x === 'number' ? Math.round(x * 1000) / 1000 : x), 1)}</pre>
             </details>
           ))}
-          {attacks.length === 0 && <div className="text-xs text-mute">Not sent to the Prosecutors: it never came close to beating the null.</div>}
+          {attacks.length === 0 && <div className="text-xs text-mute">Not sent to the Skeptics: it never came close to beating the null.</div>}
         </div>
       </div>
       {lit && lit.evidence.papers?.length > 0 && (
@@ -226,7 +228,7 @@ export default function CourtView({ s, compact = false }: { s: RunState; compact
         </Card>}
       </div>
       {s.methods && Object.values(s.methods.papers || {}).some((a: any) => a.length) && (
-        <Card title="Methods scout (OpenAlex): validated papers behind the Prosecutors">
+        <Card title="Methods scout (OpenAlex): validated papers behind the Skeptics">
           <div className="space-y-2">
             {Object.entries(s.methods.papers).filter(([, ps]: any) => ps.length).map(([area, ps]: any) => (
               <div key={area}>

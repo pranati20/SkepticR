@@ -79,7 +79,7 @@ def failure_modes(seed: int = 0) -> list[dict]:
     se = from_synthetic(d, seed)
     se.factors, se.factors_hold, se.factor_names = d.factors[:, :2], d.factors_holdout[:, :2], d.factor_names[:2]
     disc, *_ = court_discoveries(se, seed)
-    fm.append({"title": "Hidden confounders pass", "detail": "If a decoy loads on a factor the Prosecutor is not given (here VAL and MOM withheld), "
+    fm.append({"title": "Hidden confounders pass", "detail": "If a decoy loads on a factor the Skeptic is not given (here VAL and MOM withheld), "
                "the confounder attack cannot see it. Skeptic only controls for factors it knows about.",
                "metric": f"{int((disc & (se.truth == 'beta')).sum())} of 10 decoys declared DISCOVERY when VAL and MOM are hidden "
                          f"(vs {int((court_discoveries(from_synthetic(d, seed), seed)[0] & (se.truth == 'beta')).sum())} with full factors)"})
@@ -89,7 +89,7 @@ def failure_modes(seed: int = 0) -> list[dict]:
                "metric": "power curve: detection rate vs true Sharpe"})
     # 3. traps rely on spec-level checks in the synthetic benchmark
     fm.append({"title": "Synthetic traps are caught from the spec", "detail": "In the synthetic benchmark leakage and survivorship are flagged in the hypothesis spec. "
-               "On the market panel the Prosecutor re-runs the strategy to find them from data. A leak hidden from both would pass.",
+               "On the market panel the Skeptic re-runs the strategy to find them from data. A leak hidden from both would pass.",
                "metric": "see equities demo for the data-driven version"})
     # 4. null generator assumptions
     rng = np.random.default_rng(seed)

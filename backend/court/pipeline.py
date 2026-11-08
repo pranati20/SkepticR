@@ -65,7 +65,7 @@ class Court:
         tstat_all = search.obs()
         if log_tests:
             self.ledger.record_many(run_id, [{
-                "agent": h.get("agent", "hunter"), "family": h.get("family"), "hypothesis_id": h["id"], "spec": h.get("spec"),
+                "agent": h.get("agent", "researcher"), "family": h.get("family"), "hypothesis_id": h["id"], "spec": h.get("spec"),
                 "params": h.get("params"), "statistic": float(tstat_all[i]), "seed": cfg.seed,
                 "tokens": 0} for i, h in enumerate(search.hyps)])
         verdicts: dict[int, J.Verdict] = {}
@@ -98,7 +98,7 @@ class Court:
             tab = search.null_fn is not None          # tabular claims: a sign reversal or an interim-look claim must be prosecuted too
             to_pros = [int(i) for i in batch if ((null.observed[pos[int(i)]] > 0 or tab) and null.p_stepdown[pos[int(i)]] < cfg.p_luck)
                        or search.hyps[int(i)].get("spec", {}).get("peeked_at_look") is not None]
-            self._e("agent", agent="Court", text=f"{len(cands)} candidate(s) beat the null at level {level:.3f}; {len(to_pros)} borderline-or-better sent to the Prosecutors", round=r)
+            self._e("agent", agent="Court", text=f"{len(cands)} candidate(s) beat the null at level {level:.3f}; {len(to_pros)} borderline-or-better sent to the Skeptics", round=r)
             attacks: dict[int, list] = {}
             if to_pros and cfg.run_prosecutors:
                 # confounder attack evidence: audit the factor-ADJUSTED alpha across the same whole search

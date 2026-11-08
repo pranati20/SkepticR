@@ -37,7 +37,7 @@ export const initialState = (): RunState => ({
   portfolio: null, truth: null, literature: [], methods: null, illusions: [], conclusion: null, replication: {}, backtest: null, phase: 'idle', done: false, error: null, n: 0,
 })
 
-const hunterNode = (fam: string) => `${fam}-hunter`
+const researcherNode = (fam: string) => `${fam}-researcher`
 
 export function reduce(s: RunState, a: any): RunState {
   if (a.type === '__reset') return initialState()
@@ -51,7 +51,7 @@ export function reduce(s: RunState, a: any): RunState {
     case 'agent':
       return { ...s, n, active: act([e.agent]), feed: [...s.feed.slice(-80), { n, agent: e.agent, text: e.text }], phase: e.agent }
     case 'proposal':
-      return { ...s, n, proposals: [...s.proposals, e], active: act([hunterNode(e.family), 'Hunters']),
+      return { ...s, n, proposals: [...s.proposals, e], active: act([researcherNode(e.family), 'Researchers']),
         feed: e.source_paper ? [...s.feed.slice(-80), { n, agent: e.agent, text: `proposed "${e.description}" (${e.source_paper})` }] : s.feed }
     case 'backtest_progress': return { ...s, n, backtest: { done: e.done, total: e.total }, active: act(['Backtester']) }
     case 'ledger': return { ...s, n, ledger: e }
@@ -63,7 +63,7 @@ export function reduce(s: RunState, a: any): RunState {
     case 'null_audit': return { ...s, n, audits: [...s.audits, e], active: act(['Court']), phase: 'Court' }
     case 'prosecution': {
       const names = e.attacks.map((x: any) => x.attack)
-      return { ...s, n, prosecutions: { ...s.prosecutions, [e.hypothesis_id]: e.attacks }, active: act(['Prosecutors', ...names]) }
+      return { ...s, n, prosecutions: { ...s.prosecutions, [e.hypothesis_id]: e.attacks }, active: act(['Skeptics', ...names]) }
     }
     case 'verdict': return { ...s, n, verdicts: { ...s.verdicts, [e.hypothesis_id]: e }, active: act(['Judge']) }
     case 'graveyard': return { ...s, n, graveyard: [...s.graveyard, e] }

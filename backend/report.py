@@ -84,7 +84,7 @@ def build_pdf(events: list[dict]) -> bytes:
     # --- Hunter's claim
     claims = (naive.get("claims") or [])[:3]
     if claims:
-        f.append(Paragraph("The Hunters' claim (before the court)", H2))
+        f.append(Paragraph("The Researchers' claim (before the court)", H2))
         for c in claims:
             f.append(Paragraph(f"- {_t(c.get('text'), 80)} (t = {c.get('t', 0):.1f}, naive p = {c.get('p', 0):.1e})", B))
 
@@ -93,7 +93,7 @@ def build_pdf(events: list[dict]) -> bytes:
     rows_src = sorted(vs, key=lambda v: (rank.get(v["verdict"], 3), -(v.get("statistic") or 0)))
     shown = [v for v in rows_src if v["verdict"] == "DISCOVERY"][:5] + [v for v in rows_src if v["verdict"] != "DISCOVERY"][:4]
     if shown:
-        f.append(Paragraph("The Prosecutors' verdicts (most notable ideas)", H2))
+        f.append(Paragraph("The Skeptics' verdicts (most notable ideas)", H2))
         data = [["Idea", "Verdict", "Evidence", "Why"]]
         for v in shown:
             att = v.get("attacks") or []

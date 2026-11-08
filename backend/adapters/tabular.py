@@ -114,7 +114,7 @@ def build_tabular_search(spec: TabularSpec, seed: int = 0) -> Search:
     hyps, idx_o, idx_s = [], [], []
     for oi, o in enumerate(spec.outcomes):
         for si, name in enumerate(seg_names):
-            hyps.append({"id": f"{o}|{name}", "family": "overall" if name == "overall" else "subgroup", "agent": "segment-hunter",
+            hyps.append({"id": f"{o}|{name}", "family": "overall" if name == "overall" else "subgroup", "agent": "segment-researcher",
                          "description": f"effect of {spec.treat} on {o} in {name}", "prior": 0.6 if name == "overall" else 0.25,
                          "spec": {"outcome": o, "segment": name, "universe": "point_in_time", "uses_future_bar": False}})
             idx_o.append(oi); idx_s.append(si)

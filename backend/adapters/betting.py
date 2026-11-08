@@ -84,7 +84,7 @@ def build_search(df: pd.DataFrame, info: dict, holdout_days: int = 120) -> Searc
         np.add.at(pnl[k], didx[m], df.profit.to_numpy()[m])
         np.add.at(plc[k], didx[m], df.placebo.to_numpy()[m])
     Ts = T_all - holdout_days
-    hyps = [{"id": f"bet|{name}", "family": fam, "agent": f"{fam}-hunter", "description": f"Bet the predicted winner when {name}",
+    hyps = [{"id": f"bet|{name}", "family": fam, "agent": f"{fam}-researcher", "description": f"Bet the predicted winner when {name}",
              "prior": 0.5 if k == 0 else 0.25,
              "spec": {"formula": None, "rule": name, "universe": "point_in_time", "uses_future_bar": False, "n_bets": int(m.sum())}}
             for k, (name, m, fam) in enumerate(rs)]

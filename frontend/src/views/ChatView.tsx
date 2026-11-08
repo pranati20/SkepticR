@@ -74,7 +74,7 @@ export default function ChatView({ onAudit }: { onAudit?: (question: string, sou
                   {onAudit && m.sources.some((s) => s.kind === 'paper') && (
                     <div className="mt-2 rounded-lg border border-accent/40 bg-accent/5 p-2">
                       <button className="btn-primary" onClick={() => onAudit(msgs.slice(0, i).reverse().find((x) => x.role === 'user')?.content || '', m.sources!)}>Send to “Watch it work” →</button>
-                      <div className="mt-1 text-[11px] text-mute">Runs a real audit on the idea in your question and hands these papers to the Prosecutors as evidence.</div>
+                      <div className="mt-1 text-[11px] text-mute">Runs a real audit on the idea in your question and hands these papers to the Skeptics as evidence.</div>
                     </div>
                   )}
                 </div>
