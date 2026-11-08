@@ -28,6 +28,13 @@ app = FastAPI(title="Skeptic", description="Continuous integration for claims.")
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:8000", "http://127.0.0.1:8000", "http://localhost:5173", "http://127.0.0.1:5173"], allow_methods=["*"], allow_headers=["*"])
 
 RUNS: dict[str, dict] = {}
+
+
+@app.on_event("startup")
+def _warm():
+    """Fetch the OpenML catalogue in the background so the first prompt-only question does not wait for it."""
+    from . import datascout
+    datascout.warm_up()
 MAX_RUNS = 40                     # oldest runs are evicted
 MAX_WORLDS = 1000                 # clamp on caller-supplied null-world counts (CPU protection)
 MAX_CSV_CHARS = 20_000_000

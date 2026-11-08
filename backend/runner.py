@@ -45,6 +45,7 @@ TITLES = {
     "ab_test": ("A/B test with peeking", "8 metrics x many segments, analyst peeked 10 times. One effect is real."),
     "health": ("Supplement headline (Simpson's paradox)", "Supplement users look LESS healthy. Is that true once age is held fixed?"),
     "upload": ("Your claim", "Upload a CSV and describe the claim; it goes through the same Court."),
+    "discover": ("Your question, on data found online", "No dataset given: the Data Scout found a public one for your question, then the Court judged it."),
     "replication": ("Replication mode", "Paste a paper's claim; it is rebuilt on our data and judged, including decay after publication."),
 }
 
@@ -242,12 +243,12 @@ def run_betting(ctx: Ctx, params: dict) -> dict:
     return _court(ctx, search, {**params, "rounds": params.get("rounds", 3)}, truth=False)
 
 
-def _tabular(ctx: Ctx, name: str, spec: TB.TabularSpec, params: dict, standin=True) -> dict:
+def _tabular(ctx: Ctx, name: str, spec: TB.TabularSpec, params: dict, standin=True, note: str | None = None) -> dict:
     ctx.table = spec
     search = TB.build_tabular_search(spec, ctx.seed)
     _meta(ctx, name, standin=standin, claim=spec.claim, panel={"n": search.meta["n"], "n_search": search.meta["n_search"], "n_holdout": search.meta["n_holdout"],
                                                               "treat": spec.treat, "outcomes": spec.outcomes, "strata": spec.strata_cols or [],
-                                                              "note": "Simulated data with known truth." if standin else "User-supplied data."})
+                                                              "note": note or ("Simulated data with known truth." if standin else "User-supplied data.")})
     ctx.ledger.record_many(ctx.run_id, [{"agent": h["agent"], "family": h["family"], "hypothesis_id": h["id"], "spec": h["spec"], "seed": ctx.seed,
                                          "status": "proposed"} for h in search.hyps])
     ctx.emit("agent", agent="Researchers", text=f"{search.K} segment/metric effects were examined")
@@ -280,6 +281,20 @@ def run_upload(ctx: Ctx, params: dict) -> dict:
     spec = TB.TabularSpec(df=d, treat=treat, outcomes=[outcome], subgroup_cols=sub, strata_cols=strata, time_col=params.get("time"),
                           claim=params.get("claim", f"{treat} affects {outcome}"), pairs=bool(params.get("pairs", True)))
     return _tabular(ctx, "upload", spec, params, standin=False)
+
+
+def run_discover(ctx: Ctx, params: dict) -> dict:
+    """Question only, no data: the Data Scout finds a public dataset online, then the usual Court runs on it."""
+    from . import datascout as DS
+    q = str(params.get("question") or "").strip()
+    if not q:
+        raise ValueError("Write a question first: the Data Scout searches for data that can answer it.")
+    f = DS.find_dataset(q, ctx.emit, ctx.llm, ctx.seed)
+    i = f.info
+    spec = TB.TabularSpec(df=f.df, treat=f.treat, outcomes=[f.outcome], subgroup_cols=i["subgroups"], strata_cols=None,
+                          claim=f"{i['treat_rule']} changes {i['outcome_rule']}", pairs=True)
+    return _tabular(ctx, "discover", spec, params, standin=False,
+                    note=f"Public data found online: {i['title']} ({i['source']}). Treatment: {i['treat_rule']}. Outcome: {i['outcome_rule']}.")
 
 
 # ----------------------------------------------------------------------------------------------------- replication
@@ -398,7 +413,7 @@ def run_replication(ctx: Ctx, params: dict) -> dict:
 
 
 SCENARIOS = {"market": lambda c, p: run_market(c, p, False), "equities": lambda c, p: run_market(c, p, True), "synthetic": run_synthetic,
-             "betting": run_betting, "ab_test": run_ab, "health": run_health, "upload": run_upload, "replication": run_replication}
+             "betting": run_betting, "ab_test": run_ab, "health": run_health, "upload": run_upload, "discover": run_discover, "replication": run_replication}
 
 
 def run_scenario(name: str, params: dict | None = None, emit: Callable[[dict], None] | None = None, seed: int = 0) -> tuple[list[dict], dict]:

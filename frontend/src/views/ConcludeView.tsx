@@ -54,6 +54,47 @@ function Conclusion({ c }: { c: any }) {
   )
 }
 
+/** The public dataset the Data Scout found for a question-only run, and every candidate it looked at. */
+function FoundDataset({ d }: { d: any }) {
+  const ok = d.status === 'found'
+  const tried: any[] = d.tried || []
+  return (
+    <div className={`card p-4 ${ok ? 'border-gold/40' : 'border-amber-400/40'}`}>
+      <div className="mb-1 flex flex-wrap items-center gap-2">
+        <span className="text-lg font-bold">{ok ? 'Data found online' : 'No usable public dataset found'}</span>
+        {ok && <span className="rounded-full border border-gold px-2 py-0.5 text-[11px] text-gold">{d.source}</span>}
+      </div>
+      {ok && (
+        <>
+          <a href={d.url} target="_blank" rel="noreferrer" className="text-sm font-semibold text-blue-300 hover:text-white">{d.title} ↗</a>
+          <div className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
+            <div className="rounded-lg border border-line bg-panel2/50 px-3 py-2"><div className="h-label">Cause tested</div>{d.treat_rule}<div className="text-[11px] text-mute">column “{d.treat}”</div></div>
+            <div className="rounded-lg border border-line bg-panel2/50 px-3 py-2"><div className="h-label">Effect measured</div>{d.outcome_rule}<div className="text-[11px] text-mute">column “{d.outcome}”</div></div>
+          </div>
+          <div className="mt-2 text-xs text-slate-300">
+            {d.rows?.toLocaleString()} rows · {d.n_columns} columns · columns chosen by {d.mapped_by}{d.why ? `: ${d.why}` : ''}
+            {d.note ? <span className="text-mute"> · {d.note}</span> : null}
+          </div>
+        </>
+      )}
+      {tried.length > 0 && (
+        <details className="mt-3" open={!ok}>
+          <summary className="cursor-pointer text-xs text-mute">Searched {(d.sources || []).join(', ')}: looked at {tried.length} candidate{tried.length > 1 ? 's' : ''}</summary>
+          <div className="mt-2 space-y-1">
+            {tried.map((t, i) => (
+              <div key={i} className="flex flex-wrap items-baseline gap-x-3 rounded border border-line bg-ink/60 px-2 py-1 text-xs">
+                <span className={t.chosen ? 'text-gold' : t.status === 'usable' ? 'text-disc' : 'text-luck'}>{t.chosen ? 'used' : t.status}</span>
+                {t.url ? <a href={t.url} target="_blank" rel="noreferrer" className="min-w-0 flex-1 text-slate-200 hover:text-white">{t.title}</a> : <span className="min-w-0 flex-1">{t.title}</span>}
+                <span className="text-mute">{t.source}{t.reason ? ` · ${t.reason}` : t.mapping ? ` · ${t.mapping}` : ''}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+    </div>
+  )
+}
+
 /** Headline + three numbers from the recorded benchmark (nothing typed in: all read from /api/benchmark). */
 function Hero({ goProof }: { goProof: () => void }) {
   const { data: d } = useBenchmark()
@@ -89,7 +130,7 @@ function Hero({ goProof }: { goProof: () => void }) {
 
 export default function ConcludeView({ s, run, running, goCourt, goProof }: { s: RunState; run: (scenario: string, params: any) => void; running: boolean; goCourt: () => void; goProof: () => void }) {
   const [q, setQ] = useState('')
-  const [src, setSrc] = useState<'csv' | 'example'>('example')
+  const [src, setSrc] = useState<'web' | 'csv' | 'example'>('web')
   const [ds, setDs] = useState('ab_test')
   const question = q.trim()
   const started = s.meta !== null || running
@@ -111,11 +152,23 @@ export default function ConcludeView({ s, run, running, goCourt, goProof }: { s:
       </div>
       <div className="card p-4">
         <div className="h-label mb-1">2 · Your data</div>
-        <div className="mb-3 flex gap-2">
+        <div className="mb-3 flex flex-wrap gap-2">
+          <button className={`btn ${src === 'web' ? 'border-accent text-white' : ''}`} onClick={() => setSrc('web')}>Find the data for me</button>
           <button className={`btn ${src === 'example' ? 'border-accent text-white' : ''}`} onClick={() => setSrc('example')}>Use an example dataset</button>
           <button className={`btn ${src === 'csv' ? 'border-accent text-white' : ''}`} onClick={() => setSrc('csv')}>Upload my CSV</button>
         </div>
-        {src === 'example' ? (
+        {src === 'web' ? (
+          <div>
+            <div className="mb-3 text-xs text-slate-300">
+              No dataset needed. The Data Scout searches public data (OpenML, Hugging Face, Zenodo) for a table with your cause and effect, then the Court judges it as usual.
+              Ask about one specific cause, e.g. “Does smoking increase heart disease?” or “Does education increase income?”.
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <button className="btn-primary" disabled={running || !question} onClick={() => run('discover', { question })}>Search the internet and conclude</button>
+              {!question && <span className="text-xs text-mute">Write your question first.</span>}
+            </div>
+          </div>
+        ) : src === 'example' ? (
           <div className="flex flex-wrap items-center gap-3">
             <select value={ds} onChange={(e) => setDs(e.target.value)} className="btn">{DATASETS.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</select>
             <button className="btn-primary" disabled={running || !question} onClick={() => run(ds, { question })}>Find the valid conclusion</button>
@@ -126,6 +179,7 @@ export default function ConcludeView({ s, run, running, goCourt, goProof }: { s:
         ) : <div className="text-xs text-mute">Write your question first.</div>}
       </div>
 
+      {s.dataset && <FoundDataset d={s.dataset} />}
       {started && !s.conclusion && (
         <div className="card animate-pulseGlow p-4 text-sm text-slate-300">
           {s.error ? <span className="text-luck">{s.error}</span> : <>Working: <b>{s.phase}</b>. {s.proposals.length > 0 && `${s.proposals.length} candidate findings so far; `}{Object.keys(s.verdicts).length} judged…</>}

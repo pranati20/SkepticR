@@ -23,7 +23,9 @@ MAX_SEG = 220
 
 def _bin(col: pd.Series, k: int = 3) -> pd.Series:
     if col.dtype.kind in "if" and col.nunique() > 6:
-        return pd.qcut(col, k, labels=[f"{col.name}:Q{i+1}" for i in range(k)], duplicates="drop").astype(str)
+        # heavily repeated values can merge quantile edges (duplicates dropped), so label by the bins that remain
+        q = pd.qcut(col, k, labels=False, duplicates="drop")
+        return q.map(lambda i: f"{col.name}:Q{int(i) + 1}" if i == i else "nan").astype(str)
     return col.astype(str).map(lambda v: f"{col.name}={v}")
 
 
