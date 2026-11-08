@@ -1,34 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="SkepticR">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#16223a"/>
-      <stop offset="1" stop-color="#0a0f18"/>
-    </linearGradient>
-    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#f1d595"/>
-      <stop offset="1" stop-color="#c39a4e"/>
-    </linearGradient>
-  </defs>
-
-  <!-- tile -->
-  <rect x="1" y="1" width="62" height="62" rx="14" fill="url(#bg)"/>
-  <rect x="1.5" y="1.5" width="61" height="61" rx="13.5" fill="none" stroke="#d4af6a" stroke-opacity="0.55"/>
-
-  <!-- the "backtest": a P&L line that rises, then breaks down (the illusion) -->
-  <polyline points="8,44 15,40 20,42 26,33 31,35 37,24 41,30 46,38 52,41 57,47"
-            fill="none" stroke="#5b9dff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>
-
-  <!-- scales of justice, beam tipped: the evidence outweighs the claim -->
-  <g stroke="url(#gold)" stroke-linecap="round" stroke-linejoin="round" fill="none">
-    <line x1="32" y1="14" x2="32" y2="50" stroke-width="2.6"/>
-    <path d="M24 51h16" stroke-width="2.6"/>
-    <line x1="16" y1="21" x2="48" y2="16" stroke-width="2.6"/>
-    <!-- left pan (heavier, lower) -->
-    <path d="M16 21l-5 12M16 21l5 12" stroke-width="1.4"/>
-    <path d="M9.5 33h13a6.5 4 0 0 1-13 0z" fill="#d4af6a" fill-opacity="0.18" stroke-width="1.8"/>
-    <!-- right pan (lighter, higher) -->
-    <path d="M48 16l-5 12M48 16l5 12" stroke-width="1.4"/>
-    <path d="M41.5 28h13a6.5 4 0 0 1-13 0z" fill="#d4af6a" fill-opacity="0.18" stroke-width="1.8"/>
+  <!-- flat navy tile with a thin gold edge -->
+  <rect x="1" y="1" width="62" height="62" rx="12" fill="#0b1220" stroke="#c9a45c" stroke-width="1.5"/>
+  <!-- the backtest: a blue line that rises, then gives it all back -->
+  <polyline points="10,45 20,40 28,42 37,28 45,38 54,44" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- scales of justice in gold, tipped toward the evidence -->
+  <g fill="none" stroke="#c9a45c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M32 15v35M25 50h14M17 22l30-5"/>
+    <path d="M17 22l-5 11h10zM47 17l-5 11h10z" stroke-width="1.6"/>
   </g>
-  <circle cx="32" cy="13" r="2.6" fill="url(#gold)"/>
+  <circle cx="32" cy="14" r="2.4" fill="#ffffff"/>
 </svg>

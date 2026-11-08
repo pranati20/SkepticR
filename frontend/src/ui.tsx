@@ -43,7 +43,7 @@ export function Pill({ verdict }: { verdict: string }) {
 }
 
 export function Banner({ children, tone = 'amber' }: { children: ReactNode; tone?: 'amber' | 'rose' | 'sky' }) {
-  const t = { amber: 'border-amber-500/40 bg-amber-500/10 text-amber-200', rose: 'border-rose-500/40 bg-rose-500/10 text-rose-200', sky: 'border-sky-500/40 bg-sky-500/10 text-sky-200' }[tone]
+  const t = { amber: 'border-amber-500/40 bg-amber-500/10 text-amber-200', rose: 'border-rose-500/40 bg-rose-500/10 text-rose-200', sky: 'border-blue-500/40 bg-blue-500/10 text-blue-200' }[tone]
   return <div className={`rounded-xl border px-3 py-2 text-xs leading-relaxed ${t}`}>{children}</div>
 }
 
@@ -54,10 +54,10 @@ export function Gauge({ value, max, start }: { value: number; max: number; start
   const pt = (f: number) => { const a = Math.PI * (1 - f); return [cx + R * Math.cos(a), cy - R * Math.sin(a)] }
   const [x1, y1] = pt(0), [x3, y3] = pt(1), [sx, sy] = pt(Math.min(1, start / max))
   const ratio = start ? value / start : 1
-  const col = ratio > 0.7 ? '#3ecf8e' : ratio > 0.3 ? '#f2b84b' : '#f16d7f'
+  const col = ratio > 0.7 ? '#34c38f' : ratio > 0.3 ? '#e8b04b' : '#e5677a'
   return (
     <svg viewBox="0 0 200 118" className="w-full">
-      <path d={`M ${x1} ${y1} A ${R} ${R} 0 0 1 ${x3} ${y3}`} stroke="#243146" strokeWidth="14" fill="none" strokeLinecap="round" />
+      <path d={`M ${x1} ${y1} A ${R} ${R} 0 0 1 ${x3} ${y3}`} stroke="#22304d" strokeWidth="14" fill="none" strokeLinecap="round" />
       <motion.path d={`M ${x1} ${y1} A ${R} ${R} 0 0 1 ${x3} ${y3}`} stroke={col} strokeWidth="14" fill="none" strokeLinecap="round"
         initial={false} animate={{ pathLength: Math.max(0.001, frac) }} transition={{ duration: 0.6 }} />
       <line x1={sx} y1={sy} x2={cx + (sx - cx) * 0.8} y2={cy + (sy - cy) * 0.8} stroke="#94a3b8" strokeWidth="1.5" />
@@ -78,13 +78,13 @@ export function Hist({ hist, marks = [], height = 150 }: { hist: { counts: numbe
     <svg viewBox={`0 0 ${W} ${H + 24}`} className="w-full">
       {hist.counts.map((c, i) => {
         const bx = X(hist.edges[i]), bw = Math.max(1, X(hist.edges[i + 1]) - X(hist.edges[i]) - 1), bh = (c / maxC) * (H - 30)
-        return <motion.rect key={i} x={bx} width={bw} fill="#5b9dff" opacity="0.55" initial={{ height: 0, y: H }} animate={{ height: bh, y: H - bh }} transition={{ duration: 0.5, delay: i * 0.01 }} />
+        return <motion.rect key={i} x={bx} width={bw} fill="#3b82f6" opacity="0.55" initial={{ height: 0, y: H }} animate={{ height: bh, y: H - bh }} transition={{ duration: 0.5, delay: i * 0.01 }} />
       })}
-      {hist.p95 !== undefined && (<g><line x1={X(hist.p95)} x2={X(hist.p95)} y1={6} y2={H} stroke="#f2b84b" strokeDasharray="3 3" /><text x={X(hist.p95)} y={H + 14} textAnchor="middle" fontSize="9" fill="#f2b84b">luck beats this 5%</text></g>)}
+      {hist.p95 !== undefined && (<g><line x1={X(hist.p95)} x2={X(hist.p95)} y1={6} y2={H} stroke="#e8b04b" strokeDasharray="3 3" /><text x={X(hist.p95)} y={H + 14} textAnchor="middle" fontSize="9" fill="#e8b04b">luck beats this 5%</text></g>)}
       {marks.map((m, i) => (
         <g key={i}>
-          <line x1={X(m.x)} x2={X(m.x)} y1={0} y2={H} stroke={m.color || '#3ecf8e'} strokeWidth="2" />
-          <text x={Math.min(W - 40, X(m.x))} y={10 + (i % 3) * 10} fontSize="9" fill={m.color || '#3ecf8e'} textAnchor={X(m.x) > W - 90 ? 'end' : 'start'}> {m.label}</text>
+          <line x1={X(m.x)} x2={X(m.x)} y1={0} y2={H} stroke={m.color || '#34c38f'} strokeWidth="2" />
+          <text x={Math.min(W - 40, X(m.x))} y={10 + (i % 3) * 10} fontSize="9" fill={m.color || '#34c38f'} textAnchor={X(m.x) > W - 90 ? 'end' : 'start'}> {m.label}</text>
         </g>
       ))}
       <line x1={pad} x2={W - pad} y1={H} y2={H} stroke="#334155" />
@@ -102,8 +102,8 @@ export const causeIcon = (c: string) => { const k = Object.keys(CAUSE_ICON).find
 export function Tombstone({ g, onClick }: { g: any; onClick: () => void }) {
   return (
     <motion.button layout initial={{ opacity: 0, y: 20, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} whileHover={{ y: -3 }} onClick={onClick}
-      className="group relative flex h-[124px] flex-col items-center rounded-t-[56px] rounded-b-lg border border-line bg-gradient-to-b from-panel2 to-panel px-3 pb-2 pt-4 text-center hover:border-rose-400/60">
-      <div className="text-lg leading-none">{causeIcon(g.cause)}</div>
+      className="group relative flex h-[124px] flex-col items-center rounded-t-[56px] rounded-b-lg border border-line bg-panel2 px-3 pb-2 pt-4 text-center hover:border-rose-400/60">
+      <div className="h-px w-6 bg-luck/70" />
       <div className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-rose-300">{g.cause}</div>
       <div className="mt-1 line-clamp-2 text-[10px] leading-snug text-slate-300">{g.description || g.hypothesis_id}</div>
       <div className="mt-auto font-mono text-[9px] text-mute">naive p={g.p_naive !== undefined ? Number(g.p_naive).toExponential(0) : '–'}</div>

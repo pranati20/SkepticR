@@ -70,7 +70,7 @@ export default function MethodsView() {
                   <div className="flex items-start gap-2">
                     <span className="mt-0.5 rounded bg-ink px-1.5 text-[10px] font-semibold text-accent">S{n}</span>
                     <div className="min-w-0 flex-1">
-                      {p.url ? <a href={p.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-sky-300 hover:underline">{p.title}</a> : <span className="text-sm font-medium">{p.title}</span>}
+                      {p.url ? <a href={p.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-blue-300 hover:underline">{p.title}</a> : <span className="text-sm font-medium">{p.title}</span>}
                       <div className="text-[11px] text-mute">{[p.authors, p.year, p.venue].filter(Boolean).join(' · ')} · {p.source}{p.cited_by ? ` · cited ${p.cited_by}×` : ''}</div>
                       {p.abstract && <div className="mt-1 line-clamp-3 text-xs text-slate-400">{p.abstract}</div>}
                       {p.used && <div className="mt-1 rounded border-l-2 border-accent/60 bg-ink/50 px-2 py-1 text-[11px] leading-snug text-slate-300"><b className="text-accent">What we used:</b> {p.used}</div>}

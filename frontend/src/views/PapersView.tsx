@@ -32,9 +32,9 @@ export default function PapersView({ active = true }: { active?: boolean }) {
         {rows.map((e) => (
           <div key={(e.url || e.title)} className="card p-3">
             <div className="flex items-start gap-2">
-              <span className="mt-0.5">{e.kind === 'dataset' ? '🗂️' : '📄'}</span>
+              <span className="mt-0.5 rounded border border-gold/40 px-1.5 text-[10px] font-semibold uppercase tracking-wide text-gold">{e.kind === 'dataset' ? 'Data' : 'Paper'}</span>
               <div className="min-w-0 flex-1">
-                {e.url ? <a href={e.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-sky-300 hover:underline">{e.title}</a> : <span className="text-sm font-medium">{e.title}</span>}
+                {e.url ? <a href={e.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-blue-300 hover:underline">{e.title}</a> : <span className="text-sm font-medium">{e.title}</span>}
                 <div className="text-[11px] text-mute">{[e.authors, e.year, e.venue].filter(Boolean).join(' · ')} · {e.source}</div>
                 {e.used?.map((u, i) => <div key={i} className="mt-1 rounded border-l-2 border-accent/60 bg-ink/50 px-2 py-1 text-[11px] leading-snug text-slate-300"><b className="text-accent">What we used:</b> {u}</div>)}
                 <div className="mt-1.5 flex flex-wrap gap-1.5">

@@ -16,7 +16,7 @@ function SourceCard({ s, n }: { s: Source; n: number }) {
       <div className="flex items-start gap-2">
         <span className="mt-0.5 rounded bg-ink px-1.5 text-[10px] font-semibold text-accent">S{n}</span>
         <div className="min-w-0">
-          <div className="text-sm text-sky-300 underline-offset-2 hover:underline">{s.kind === 'paper' ? '📄' : '🗂️'} {s.title}</div>
+          <div className="text-sm text-blue-300 underline-offset-2 hover:underline">{s.title}</div>
           <div className="text-[11px] text-mute">{[s.by, s.year, s.venue].filter(Boolean).join(' · ')} · {s.source}</div>
           {s.snippet && <div className="mt-1 line-clamp-2 text-xs text-slate-400">{s.snippet}</div>}
         </div>
@@ -65,7 +65,7 @@ export default function ChatView({ onAudit }: { onAudit?: (question: string, sou
         )}
         {msgs.map((m, i) => (
           <div key={i} className={m.role === 'user' ? 'flex justify-end' : ''}>
-            <div className={`max-w-[92%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${m.role === 'user' ? 'bg-accent/90 text-ink' : 'border border-line bg-panel2/70 text-slate-200'}`}>
+            <div className={`max-w-[92%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${m.role === 'user' ? 'bg-accent text-white' : 'border border-line bg-panel2/70 text-slate-200'}`}>
               <div className="whitespace-pre-wrap">{m.content}</div>
               {m.sources && m.sources.length > 0 && (
                 <div className="mt-3 space-y-1.5">

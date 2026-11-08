@@ -22,7 +22,7 @@ export default function SplitView({ s }: { s: RunState }) {
           <div className="max-h-[520px] space-y-1 overflow-y-auto pr-1">
             {claims.map((c) => (
               <div key={c.id} className="flex items-center gap-2 rounded-md bg-amber-300/5 px-2 py-1 text-[13px]">
-                <span className="text-amber-300">★</span><span className="flex-1 truncate">{c.text}</span><span className="font-mono text-[11px] text-mute">t={fmt(c.t, 1)}</span>
+                <span className="text-gold">•</span><span className="flex-1 truncate">{c.text}</span><span className="font-mono text-[11px] text-mute">t={fmt(c.t, 1)}</span>
               </div>))}
           </div>
         </Card>

@@ -82,7 +82,7 @@ export function reduce(s: RunState, a: any): RunState {
   }
 }
 
-export const VERDICT_COLOR: Record<string, string> = { DISCOVERY: '#3ecf8e', LUCK: '#f16d7f', "CAN'T TELL YET": '#f2b84b' }
+export const VERDICT_COLOR: Record<string, string> = { DISCOVERY: '#34c38f', LUCK: '#e5677a', "CAN'T TELL YET": '#e8b04b' }
 
 export function counts(s: RunState) {
   const c = { DISCOVERY: 0, LUCK: 0, CANT: 0 }

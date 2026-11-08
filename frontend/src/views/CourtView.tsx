@@ -33,14 +33,14 @@ function SwarmGraph({ s }: { s: RunState }) {
     <svg viewBox={`0 0 520 ${H}`} className="w-full">
       {edges.map(([a, b], i) => {
         const [x1, y1] = pos[a], [x2, y2] = pos[b]; const on = hot(a) || hot(b)
-        return <line key={i} x1={x1 + 24} y1={y1} x2={x2 - 24} y2={y2} stroke={on ? '#5b9dff' : '#243146'} strokeWidth={on ? 1.6 : 0.8} opacity={on ? 0.95 : 0.55} />
+        return <line key={i} x1={x1 + 24} y1={y1} x2={x2 - 24} y2={y2} stroke={on ? '#3b82f6' : '#22304d'} strokeWidth={on ? 1.6 : 0.8} opacity={on ? 0.95 : 0.55} />
       })}
       {cols.map((c) => c.nodes.map((n) => {
         const [x, y] = pos[n.id]; const on = hot(n.id)
         return (
           <g key={n.id}>
-            <motion.rect x={x - 26} y={y - 9} width={52} height={18} rx={9} fill={on ? '#14315f' : '#0d121b'} stroke={on ? '#5b9dff' : '#2a3a55'} animate={{ opacity: on ? 1 : 0.8 }} />
-            <text x={x} y={y + 3} textAnchor="middle" fontSize="7" fill={on ? '#e3edff' : '#94a3b8'}>{n.label.length > 12 ? n.label.slice(0, 11) + '…' : n.label}</text>
+            <motion.rect x={x - 26} y={y - 9} width={52} height={18} rx={9} fill={on ? '#16305e' : '#101a2e'} stroke={on ? '#3b82f6' : '#2a3a5c'} animate={{ opacity: on ? 1 : 0.8 }} />
+            <text x={x} y={y + 3} textAnchor="middle" fontSize="7" fill={on ? '#ffffff' : '#94a3b8'}>{n.label.length > 12 ? n.label.slice(0, 11) + '…' : n.label}</text>
           </g>
         )
       }))}
@@ -78,7 +78,7 @@ function TokenMeter({ s }: { s: RunState }) {
       <div className="grid grid-cols-3 gap-3">
         <Stat label="LLM tokens" value={totalTok.toLocaleString()} sub={`${calls} calls`} />
         <Stat label="Cost" value={`$${fmt(t?.total_cost_usd ?? 0, 3)}`} sub="MockLLM = $0" />
-        <Stat label="Zero-token ops" value={stat.toLocaleString()} color="#3ecf8e" sub="null worlds, backtests, attacks" />
+        <Stat label="Zero-token ops" value={stat.toLocaleString()} color="#34c38f" sub="null worlds, backtests, attacks" />
       </div>
       <div>
         <div className="mb-1 flex justify-between text-[11px] text-mute"><span>statistics (no tokens)</span><span>LLM calls</span></div>
@@ -104,7 +104,7 @@ function LedgerTicker({ s }: { s: RunState }) {
     <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
       <Stat label="Ideas tried" value={(L.tests || 0).toLocaleString()} sub="every test, every agent" />
       <Stat label="Cleaning choices" value={L.cleaning_choices || 0} sub={`${L.cleaning_paths || 1} forking paths`} />
-      <Stat label="Effective search" value={(L.effective || L.tests || 0).toLocaleString()} color="#5b9dff" sub="what luck must beat" />
+      <Stat label="Effective search" value={(L.effective || L.tests || 0).toLocaleString()} color="#3b82f6" sub="what luck must beat" />
       <Stat label="Agents searching" value={L.agents || 0} sub="10 agents = 10x the luck" />
     </div>
   )
@@ -124,7 +124,7 @@ export function Detail({ s, id }: { s: RunState; id: string }) {
       <div>
         <div className="h-label">{v.family}</div>
         <h2 className="mt-1 text-lg font-semibold leading-snug">{v.description || id}</h2>
-        {v.formula && <code className="mt-1 block break-all rounded bg-ink px-2 py-1 text-xs text-sky-300">{v.formula}</code>}
+        {v.formula && <code className="mt-1 block break-all rounded bg-ink px-2 py-1 text-xs text-blue-300">{v.formula}</code>}
         <div className="mt-2 flex items-center gap-2"><Pill verdict={v.verdict} />{v.cause_of_death && <span className="text-sm text-rose-300">{v.cause_of_death}</span>}</div>
       </div>
       <Banner tone={v.verdict === 'DISCOVERY' ? 'sky' : 'amber'}>“{v.confession}”</Banner>
@@ -148,7 +148,7 @@ export function Detail({ s, id }: { s: RunState; id: string }) {
           {attacks.map((a: any, i: number) => (
             <details key={i} className="rounded-lg border border-line bg-panel2/60 px-3 py-2">
               <summary className="flex cursor-pointer items-center gap-2 text-sm">
-                <span>{a.survived ? '✅' : a.severity === 'high' ? '☠️' : '⚠️'}</span>
+                <span className={`mt-1 inline-block h-2 w-2 shrink-0 rounded-full ${a.survived ? 'bg-disc' : a.severity === 'high' ? 'bg-luck' : 'bg-maybe'}`} />
                 <span className="font-medium">{ATTACK_NAMES[a.attack] || a.attack}</span>
                 <span className="text-[10px] uppercase text-mute">{a.severity}</span>
                 <span className={`ml-auto text-xs ${a.survived ? 'text-disc' : 'text-rose-300'}`}>{a.survived ? 'survived' : 'FAILED'}</span>
@@ -162,7 +162,7 @@ export function Detail({ s, id }: { s: RunState; id: string }) {
       {lit && lit.evidence.papers?.length > 0 && (
         <div>
           <div className="h-label mb-1">Librarian: papers checked against this scenario</div>
-          {lit.evidence.papers.map((p: any, i: number) => (<div key={i} className="text-xs text-slate-300">📄 {p.authors} ({p.year}) — {p.url ? <a href={p.url} target="_blank" rel="noreferrer" className="text-sky-300 underline">{p.title}</a> : p.title} <span className="text-mute">{p.source ? `${p.source} · ` : ''}· applicability {p.applicability ?? '–'}</span>{p.used && <div className="mt-1 rounded border-l-2 border-accent/60 bg-ink/50 px-2 py-1 text-[11px] leading-snug text-slate-300"><b className="text-accent">What we used:</b> {p.used}</div>}</div>))}
+          {lit.evidence.papers.map((p: any, i: number) => (<div key={i} className="text-xs text-slate-300">{p.authors} ({p.year}) — {p.url ? <a href={p.url} target="_blank" rel="noreferrer" className="text-blue-300 underline">{p.title}</a> : p.title} <span className="text-mute">{p.source ? `${p.source} · ` : ''}· applicability {p.applicability ?? '–'}</span>{p.used && <div className="mt-1 rounded border-l-2 border-accent/60 bg-ink/50 px-2 py-1 text-[11px] leading-snug text-slate-300"><b className="text-accent">What we used:</b> {p.used}</div>}</div>))}
           {lit.evidence.caveats?.map((c: string, i: number) => <div key={i} className="mt-1 text-[11px] text-amber-300/90">• {c}</div>)}
         </div>
       )}
@@ -175,8 +175,8 @@ export function Detail({ s, id }: { s: RunState; id: string }) {
         <div>
           <div className="h-label mb-1">Strategy card · Sharpe {fmt(card.sharpe_gross)} gross / {fmt(card.sharpe_net)} net · deflated {pct(card.deflated_sharpe_prob)} · maxDD {pct(card.max_drawdown_net, 1)}</div>
           <div className="h-36"><ResponsiveContainer><AreaChart data={card.equity_net.map((y: number, i: number) => ({ i, net: y, gross: card.equity_gross[i] }))}>
-            <CartesianGrid stroke="#243146" /><XAxis dataKey="i" hide /><YAxis width={42} tick={{ fontSize: 10, fill: '#64748b' }} /><Tooltip contentStyle={{ background: '#0d121b', border: '1px solid #243146' }} />
-            <Area dataKey="gross" stroke="#64748b" fill="#64748b22" /><Area dataKey="net" stroke="#3ecf8e" fill="#3ecf8e22" /></AreaChart></ResponsiveContainer></div>
+            <CartesianGrid stroke="#22304d" /><XAxis dataKey="i" hide /><YAxis width={42} tick={{ fontSize: 10, fill: '#64748b' }} /><Tooltip contentStyle={{ background: '#101a2e', border: '1px solid #22304d' }} />
+            <Area dataKey="gross" stroke="#64748b" fill="#64748b22" /><Area dataKey="net" stroke="#34c38f" fill="#34c38f22" /></AreaChart></ResponsiveContainer></div>
           <div className="text-[11px] text-mute">{card.capacity_note} {card.disclaimer}</div>
         </div>
       )}
@@ -193,7 +193,7 @@ export default function CourtView({ s, compact = false }: { s: RunState; compact
   const audit = s.audits[s.audits.length - 1]
   const discs = Object.values(s.verdicts).filter((v: any) => v.verdict === 'DISCOVERY')
   const maybe = Object.values(s.verdicts).filter((v: any) => v.verdict === "CAN'T TELL YET")
-  const topMarks = (audit?.top_observed || []).slice(0, 3).map((t: any) => ({ x: t.stat, label: `best found ${fmt(t.stat, 1)}`, color: '#3ecf8e' }))
+  const topMarks = (audit?.top_observed || []).slice(0, 3).map((t: any) => ({ x: t.stat, label: `best found ${fmt(t.stat, 1)}`, color: '#34c38f' }))
   return (
     <div className="space-y-4">
       <IllusionCard s={s} />
@@ -232,9 +232,9 @@ export default function CourtView({ s, compact = false }: { s: RunState; compact
           <div className="space-y-2">
             {Object.entries(s.methods.papers).filter(([, ps]: any) => ps.length).map(([area, ps]: any) => (
               <div key={area}>
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-sky-300">{area}</div>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-blue-300">{area}</div>
                 {ps.map((p: any, i: number) => (
-                  <div key={i} className="text-xs text-slate-300">📄 {p.authors} ({p.year}) — <a href={p.url} target="_blank" rel="noreferrer" className="text-sky-300 underline">{p.title}</a>
+                  <div key={i} className="text-xs text-slate-300">{p.authors} ({p.year}) — <a href={p.url} target="_blank" rel="noreferrer" className="text-blue-300 underline">{p.title}</a>
                     <span className="text-mute"> · {p.venue} · {p.cited_by} citations · peer-reviewed ✓ abstract ✓ on-topic ✓</span>{p.used && <div className="mt-1 rounded border-l-2 border-accent/60 bg-ink/50 px-2 py-1 text-[11px] leading-snug text-slate-300"><b className="text-accent">What we used:</b> {p.used}</div>}</div>
                 ))}
               </div>
@@ -262,7 +262,7 @@ export default function CourtView({ s, compact = false }: { s: RunState; compact
               <motion.button key={v.hypothesis_id} initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} onClick={() => setSel(v.hypothesis_id)} className="block w-full rounded-lg border border-disc/30 bg-disc/5 p-2 text-left hover:border-disc">
                 <div className="flex items-center gap-2"><Pill verdict="DISCOVERY" /><span className="truncate text-sm">{v.description}</span></div>
                 <div className="mt-1 text-[11px] italic text-slate-400">“{v.confession}”</div>
-                {s.prereg[v.hypothesis_id] && <div className="mt-1 text-[11px] text-sky-300">holdout-committed {s.prereg[v.hypothesis_id].hash.slice(0, 10)}… → out-of-sample {s.prereg[v.hypothesis_id].oos.confirmed ? 'confirmed ✓' : 'not confirmed ✗'}</div>}
+                {s.prereg[v.hypothesis_id] && <div className="mt-1 text-[11px] text-blue-300">holdout-committed {s.prereg[v.hypothesis_id].hash.slice(0, 10)}… → out-of-sample {s.prereg[v.hypothesis_id].oos.confirmed ? 'confirmed ✓' : 'not confirmed ✗'}</div>}
               </motion.button>))}
             {maybe.slice(0, 3).map((v: any) => (
               <button key={v.hypothesis_id} onClick={() => setSel(v.hypothesis_id)} className="block w-full rounded-lg border border-maybe/30 bg-maybe/5 p-2 text-left hover:border-maybe">

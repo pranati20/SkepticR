@@ -46,25 +46,27 @@ export default function App() {
   const showControls = tab === 'court' || tab === 'split'
   return (
     <div className="mx-auto max-w-[1500px] px-4 pb-16 pt-4">
-      <header className="mb-5 flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-line/70 pb-4">
+      <header className="mb-6 border-b border-line">
+       <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pb-4 pt-2">
         <div className="flex items-center gap-3">
           {/* LOGO: the file is frontend/public/logo.svg (also the browser-tab icon); replace that file to change it */}
-          <img src="/logo.svg" alt="SkepticR logo" className="h-11 w-11 shrink-0 drop-shadow-[0_6px_18px_rgba(212,175,106,0.25)]" />
+          <img src="/logo.svg" alt="SkepticR logo" className="h-11 w-11 shrink-0" />
           <div>
             <h1 className="font-display text-[26px] font-bold leading-none tracking-tight text-white">Skeptic<span className="text-gold">R</span></h1>
             <div className="mt-1 text-[11px] font-medium uppercase tracking-[0.16em] text-mute">signal or luck · statistical audit</div>
           </div>
         </div>
-        <nav className="flex flex-wrap gap-1 rounded-xl border border-line bg-panel/90 p-1">
+        <div className="ml-auto flex items-center gap-3 font-mono text-xs text-mute">{run.source || ''}
+          {s.done && run.last && s.proposals.length > 0 && (
+            <a className="btn-primary" href={`/api/report?${run.last.run ? 'run=' + run.last.run : 'demo=' + run.last.demo}`} download>Export report (PDF)</a>
+          )}</div>
+       </div>
+        <nav className="flex flex-wrap items-center gap-1">
           {TABS.map(([id, label]) => (
-            <button key={id} onClick={() => open(id)} className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${tab === id ? 'bg-accent text-ink shadow-sm' : 'text-slate-300 hover:bg-panel2 hover:text-white'}`}>{label}</button>
+            <button key={id} onClick={() => open(id)} className={`-mb-px border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${tab === id ? 'border-gold text-white' : 'border-transparent text-slate-400 hover:text-white'}`}>{label}</button>
           ))}
           {run.running && tab !== 'conclude' && tab !== 'court' && <span className="flex items-center gap-1.5 px-2 text-xs text-accent"><span className="h-1.5 w-1.5 animate-pulseGlow rounded-full bg-accent" />running…</span>}
         </nav>
-        <div className="ml-auto flex items-center gap-3 font-mono text-xs text-mute">{run.source || ''}
-          {s.done && run.last && s.proposals.length > 0 && (
-            <a className="btn-primary" href={`/api/report?${run.last.run ? 'run=' + run.last.run : 'demo=' + run.last.demo}`} download>⬇ Export report (PDF)</a>
-          )}</div>
       </header>
 
       {showControls && (
@@ -82,8 +84,8 @@ export default function App() {
           <span className="text-sm text-slate-300">1. Pick an example</span>
           <select value={scenario} onChange={(e) => setScenario(e.target.value)} className="btn">{SCENARIOS.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}</select>
           <span className="text-sm text-slate-300">2.</span>
-          <button className="btn-primary" disabled={run.running} onClick={go}>▶ Start</button>
-          {run.running && <button className="btn" onClick={run.stop}>■ Stop</button>}
+          <button className="btn-primary" disabled={run.running} onClick={go}>Start</button>
+          {run.running && <button className="btn" onClick={run.stop}>Stop</button>}
           <button className="btn" onClick={run.reset}>Clear</button>
           <details className="ml-auto text-xs text-mute">
             <summary className="cursor-pointer">Options</summary>

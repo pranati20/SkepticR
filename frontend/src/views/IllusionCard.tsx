@@ -63,23 +63,23 @@ function Chart({ a, b, stake, nDays, unit, k }: { a: number[]; b: number[]; stak
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={`Backtest ${short(endA)} versus reality ${short(endB)}`}>
       {ticks(lo, hi).map((t) => (
         <g key={t}>
-          <line x1={L} x2={xe} y1={Y(t)} y2={Y(t)} stroke={t === 0 ? '#475569' : '#1c2636'} strokeDasharray={t === 0 ? '4 4' : undefined} />
-          <text x={L - 6} y={Y(t) + 3} textAnchor="end" fontSize="10" fill="#9ba7bb" className="font-mono">{short(t)}</text>
+          <line x1={L} x2={xe} y1={Y(t)} y2={Y(t)} stroke={t === 0 ? '#475569' : '#1a2540'} strokeDasharray={t === 0 ? '4 4' : undefined} />
+          <text x={L - 6} y={Y(t) + 3} textAnchor="end" fontSize="10" fill="#a9b4c7" className="font-mono">{short(t)}</text>
         </g>
       ))}
-      <text x={L} y={H - 8} fontSize="10" fill="#9ba7bb">day 1</text>
-      <text x={xe} y={H - 8} textAnchor="end" fontSize="10" fill="#9ba7bb">day {nDays.toLocaleString()} ({unit})</text>
-      {area && <motion.path key={'g' + k} d={area} fill={gap > 0 ? '#f16d7f' : '#9ba7bb'} initial={{ opacity: 0 }} animate={{ opacity: 0.1 }} transition={{ delay: 3.0, duration: 0.6 }} />}
-      <motion.path key={'a' + k} d={path(A)} fill="none" stroke="#3ecf8e" strokeWidth={2.2} strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.6, ease: 'easeInOut' }} />
-      <motion.path key={'b' + k} d={path(B)} fill="none" stroke="#f16d7f" strokeWidth={2.2} strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.4, delay: 1.7, ease: 'easeInOut' }} />
+      <text x={L} y={H - 8} fontSize="10" fill="#a9b4c7">day 1</text>
+      <text x={xe} y={H - 8} textAnchor="end" fontSize="10" fill="#a9b4c7">day {nDays.toLocaleString()} ({unit})</text>
+      {area && <motion.path key={'g' + k} d={area} fill={gap > 0 ? '#e5677a' : '#a9b4c7'} initial={{ opacity: 0 }} animate={{ opacity: 0.1 }} transition={{ delay: 3.0, duration: 0.6 }} />}
+      <motion.path key={'a' + k} d={path(A)} fill="none" stroke="#34c38f" strokeWidth={2.2} strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.6, ease: 'easeInOut' }} />
+      <motion.path key={'b' + k} d={path(B)} fill="none" stroke="#e5677a" strokeWidth={2.2} strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.4, delay: 1.7, ease: 'easeInOut' }} />
       <motion.g key={'e' + k} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 3.1 }}>
-        <circle cx={xe} cy={ya} r={3.5} fill="#3ecf8e" />
-        <circle cx={xe} cy={yb} r={3.5} fill="#f16d7f" />
-        <text x={xe + 8} y={la + 3.5} fontSize="11" fontWeight="600" fill="#3ecf8e" className="font-mono">{short(endA)}</text>
-        <text x={xe + 8} y={lb + 3.5} fontSize="11" fontWeight="600" fill="#f16d7f" className="font-mono">{short(endB)}</text>
+        <circle cx={xe} cy={ya} r={3.5} fill="#34c38f" />
+        <circle cx={xe} cy={yb} r={3.5} fill="#e5677a" />
+        <text x={xe + 8} y={la + 3.5} fontSize="11" fontWeight="600" fill="#34c38f" className="font-mono">{short(endA)}</text>
+        <text x={xe + 8} y={lb + 3.5} fontSize="11" fontWeight="600" fill="#e5677a" className="font-mono">{short(endB)}</text>
         {gap > 0 && Math.abs(ya - yb) > 2 * sep && (
           <g>
-            <line x1={xe + 4} x2={xe + 4} y1={ya + 6} y2={yb - 6} stroke="#f16d7f" strokeWidth={1} strokeDasharray="2 3" />
+            <line x1={xe + 4} x2={xe + 4} y1={ya + 6} y2={yb - 6} stroke="#e5677a" strokeWidth={1} strokeDasharray="2 3" />
             <text x={xe + 8} y={mid - 2} fontSize="9" fill="#f6a3ae">cost</text>
             <text x={xe + 8} y={mid + 10} fontSize="11" fontWeight="700" fill="#f6a3ae" className="font-mono">{short(gap)}</text>
           </g>
@@ -124,10 +124,10 @@ export default function IllusionCard({ s }: { s: RunState }) {
   }, [items, stakeTxt])
 
   return (
-    <div ref={box} className="card overflow-hidden border-rose-500/30 bg-gradient-to-br from-rose-950/30 via-panel to-panel p-4">
+    <div ref={box} className="card overflow-hidden p-4">
       <div className="mb-2 flex flex-wrap items-center gap-3">
         <div>
-          <div className="text-lg font-bold tracking-tight">💸 The Cost of Illusion</div>
+          <div className="text-lg font-bold tracking-tight">The Cost of Illusion</div>
           <div className="text-xs text-mute">The Judge throws out a strategy that <i>looked</i> profitable. This is what believing it would have cost.</div>
         </div>
         {cur && (
