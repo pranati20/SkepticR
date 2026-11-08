@@ -22,6 +22,7 @@ export interface RunState {
   literature: any[]
   methods: any | null
   illusions: any[]
+  effectCheck: any | null         // non-money runs with no illusion: the headline finding, tested vs fresh data
   conclusion: any | null
   dataset: any | null            // prompt-only flow: the public dataset the Data Scout found (and what it tried)
   replication: { extracted?: any; decay?: any }
@@ -35,7 +36,7 @@ export interface RunState {
 export const initialState = (): RunState => ({
   meta: null, dataQuality: null, naive: null, proposals: [], feed: [], active: {}, ledger: { tests: 0, cleaning_choices: 0, agents: 0, potential_paths: 0 },
   credibility: { wealth: 0, wealth0: 0, history: [] }, tokens: null, audits: [], prosecutions: {}, verdicts: {}, graveyard: [], prereg: {}, cards: {},
-  portfolio: null, truth: null, literature: [], methods: null, illusions: [], conclusion: null, dataset: null, replication: {}, backtest: null, phase: 'idle', done: false, error: null, n: 0,
+  portfolio: null, truth: null, literature: [], methods: null, illusions: [], effectCheck: null, conclusion: null, dataset: null, replication: {}, backtest: null, phase: 'idle', done: false, error: null, n: 0,
 })
 
 const researcherNode = (fam: string) => `${fam}-researcher`
@@ -60,6 +61,7 @@ export function reduce(s: RunState, a: any): RunState {
     case 'conclusion': return { ...s, n, conclusion: e, active: act(['Judge']) }
     case 'dataset': return { ...s, n, dataset: e, active: act(['Data Scout']) }
     case 'illusion': return { ...s, n, illusions: [...s.illusions, e], active: act(['Judge']) }
+    case 'effect_check': return { ...s, n, effectCheck: e, active: act(['Judge']) }
     case 'methods': return { ...s, n, methods: e, active: act(['Librarian']) }
     case 'literature': return { ...s, n, literature: [...s.literature, e], active: act(['Librarian']) }
     case 'null_audit': return { ...s, n, audits: [...s.audits, e], active: act(['Court']), phase: 'Court' }

@@ -83,3 +83,16 @@ def test_tabular_bins_survive_heavily_repeated_values():
     s = pd.Series([0] * 200 + list(range(1, 9)) * 20, name="siblings")     # two of the three tercile edges are 0: they merge
     b = TB._bin(s)                                                          # used to raise "Bin labels must be one fewer..."
     assert b.nunique() == 2 and all(v.startswith("siblings:Q") for v in b.unique())
+
+
+def test_effect_illusions_for_non_money_runs():
+    """Tabular runs price the illusion in outcome units: refused findings whose effect shrinks on held-back data."""
+    from skeptic.backend import runner
+    ev = []
+    runner.run_scenario("health", {"question": "Do supplement users really have better health scores?"}, emit=ev.append)
+    il = [e for e in ev if e["type"] == "illusion"]
+    assert il and all(e["kind"] == "effect" for e in il)
+    for e in il:
+        assert e["direction"] * (e["in_total"] - e["real_total"]) > 0          # fresh data disappoints: it is an illusion
+        assert len(e["in_curve"]) >= 2 and abs(e["in_curve"][-1] - e["in_total"]) < 1e-9
+        assert e["n_hold"] > 0 and e["binary"] in (True, False)

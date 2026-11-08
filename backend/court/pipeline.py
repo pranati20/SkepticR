@@ -213,7 +213,36 @@ def _reality(self, search: Search, i: int, v, cfg_attack) -> tuple[np.ndarray, s
 
 def _emit_illusions(self, search: Search, verdicts: dict, tstat_all: np.ndarray, top: int = 8):
     """'Cost of illusion': strategies the Judge threw out as LUCK that nevertheless looked profitable in the backtest.
-    Compares what the backtest promised with what the strategy really delivers over the same period (see _reality)."""
+    Compares what the backtest promised with what the strategy really delivers over the same period (see _reality).
+    Non-money domains (search.illusion_fn): findings a naive analysis would have reported (significant on their own,
+    one-sided p < 0.05, before correcting for the search) that the Judge did not accept, comparing the effect the tested
+    data promised with the same comparison on held-back data."""
+    if search.illusion_fn is not None:
+        lucky = [i for i, v in verdicts.items() if v.verdict != J.DISCOVERY and float(tstat_all[i]) >= 1.645]
+        lucky.sort(key=lambda i: -float(tstat_all[i]))
+        shown = 0
+        for i in lucky:
+            if shown >= top:
+                break
+            info = search.illusion_fn(i)
+            # an illusion must also disappoint on fresh data; a refused finding that holds up there was caution, not illusion
+            if not info or info["direction"] * (info["in_total"] - info["real_total"]) <= 0:
+                continue
+            v, h = verdicts[i], search.hyps[i]
+            self._e("illusion", hypothesis_id=h["id"], description=h.get("description"), p_adj=v.p_adj,
+                    cause=v.cause_of_death or ("Too little data to tell" if v.verdict == J.CANT_TELL else "Not accepted"), kind="effect", n_lucky_total=len(lucky), basis="the same comparison on fresh data it was never tuned on",
+                    t_in=float(tstat_all[i]), **info)
+            shown += 1
+        if shown == 0:      # nothing to price: show the headline finding, tested vs fresh, so the card still answers the question
+            heads = [i for i in verdicts if search.hyps[i].get("family") == "overall"]
+            heads.sort(key=lambda i: -abs(float(tstat_all[i])))
+            for i in heads[:1]:
+                info = search.illusion_fn(i)
+                if info:
+                    v, h = verdicts[i], search.hyps[i]
+                    self._e("effect_check", hypothesis_id=h["id"], description=h.get("description"), verdict=v.verdict, p_adj=v.p_adj,
+                            n_refused=len(lucky), basis="the same comparison on fresh data it was never tuned on", **info)
+        return
     if search.pnl is None or search.pnl_hold is None or search.null_fn is not None:
         return
     lucky = [i for i, v in verdicts.items() if v.verdict == J.LUCK and search.pnl[i].sum() > 0 and tstat_all[i] >= 2.0]

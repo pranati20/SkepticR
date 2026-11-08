@@ -38,6 +38,7 @@ class Search:
     attack_fns: list | None = None          # replaces the default attack list: [fn(search,k,cfg)->result]
     extra_attack_fns: list | None = None    # appended to the default list
     oos_fn: Callable | None = None          # oos_fn(k) -> {n_days, oos_sharpe, t, p_one_sided, confirmed}
+    illusion_fn: Callable | None = None     # illusion_fn(k) -> promised vs real effect in outcome units (non-money domains), or None
     unit: str = "days"                      # unit of "more data needed"
     literature: dict | None = None          # Librarian evidence per hypothesis id (fed to the literature attack)
     domain: str = "market"

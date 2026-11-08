@@ -256,8 +256,42 @@ def build_tabular_search(spec: TabularSpec, seed: int = 0) -> Search:
         p = float(st.norm.sf(t))
         return {"n_days": int(m.sum()), "oos_sharpe": t, "t": t, "p_one_sided": p, "confirmed": bool(p < 0.05 and t > 0)}
 
+    Yh_raw = np.column_stack([H_df[o].to_numpy().astype(float) for o in spec.outcomes])
+
+    def _running(mask, wv, y, points=100, min_group=10):
+        """Running difference (treated mean - untreated mean) as more of the sample is read, in the outcome's own units.
+        Sampled at `points` evenly spaced shares of the sample, starting once both groups have `min_group` people."""
+        ix = np.where(mask > 0)[0]
+        if len(ix) == 0:
+            return []
+        t, yy = wv[ix], y[ix]
+        n1, n0 = np.cumsum(t), np.cumsum(1 - t)
+        s1, s0 = np.cumsum(yy * t), np.cumsum(yy * (1 - t))
+        ok = np.where((n1 >= min_group) & (n0 >= min_group))[0]
+        if len(ok) == 0:
+            return []
+        at = np.unique(np.linspace(ok[0], len(ix) - 1, points).astype(int))
+        return [float(s1[i] / n1[i] - s0[i] / n0[i]) for i in at]
+
+    def illusion_fn(k):
+        """What the tested data promised vs what the same comparison shows on held-back data, in outcome units."""
+        name, oi = search.hyps[k]["spec"]["segment"], idx_o[k]
+        hm = H_masks.get(name)
+        if hm is None:
+            return None
+        a = _running(M_all[idx_s[k]], w, Yraw[:, oi])
+        b = _running(hm.astype(float), wh, Yh_raw[:, oi])
+        if len(a) < 2 or len(b) < 2:
+            return None
+        y = Yraw[:, oi]
+        binary = bool(np.isin(np.unique(y[~np.isnan(y)]), [0.0, 1.0]).all())
+        m = M_all[idx_s[k]] > 0
+        return {"treat": spec.treat, "outcome": spec.outcomes[oi], "segment": name, "binary": binary,
+                "direction": int(direction[k]), "in_curve": a, "real_curve": b, "in_total": a[-1], "real_total": b[-1],
+                "base_rate": float(y[m & (w == 0)].mean()), "n_in": int(m.sum()), "n_hold": int(hm.sum())}
+
     search = Search(hyps=hyps, pnl=None, pnl_hold=None, factors=None, factors_hold=None, factor_names=[], turnover=None,
-                    domain="tabular", observed=observed, n_obs=n_search, null_fn=null_fn,
+                    domain="tabular", observed=observed, n_obs=n_search, null_fn=null_fn, illusion_fn=illusion_fn,
                     attack_fns=[simpson, concentration, stability, peeking], oos_fn=oos_fn, unit="participants",
                     meta={"claim": spec.claim, "treat": spec.treat, "outcomes": spec.outcomes,
                           "strata": spec.strata_cols or [], "n": n_all, "n_search": n_search, "n_holdout": n_all - n_search,
