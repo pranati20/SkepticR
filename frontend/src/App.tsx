@@ -4,7 +4,6 @@ import { useRun } from './useRun'
 import CourtView from './views/CourtView'
 import SplitView from './views/SplitView'
 import PapersView from './views/PapersView'
-import ChatView from './views/ChatView'
 import MethodsView from './views/MethodsView'
 import ConcludeView from './views/ConcludeView'
 import ProofView from './views/ProofView'
@@ -20,7 +19,7 @@ const SCENARIOS = [
 ]
 const TABS = [
   ['conclude', 'Find a conclusion'], ['court', 'Watch it work'], ['split', 'AI vs SkepticR'], ['proof', 'Proof'],
-  ['ask', 'Find papers & data'], ['methods', 'Improve the algorithm'], ['papers', 'Papers it used'],
+  ['methods', 'Improve the algorithm'], ['papers', 'Papers it used'],
 ] as const
 
 export default function App() {
@@ -32,19 +31,7 @@ export default function App() {
   const open = (t: Tab) => { setSeen((p) => (p.has(t) ? p : new Set(p).add(t))); setTab(t) }
   const [scenario, setScenario] = useState('market')
   const [mode, setMode] = useState<'demo' | 'live'>('demo')
-  const [chatCtx, setChatCtx] = useState<{ question: string; papers: any[] } | null>(null)
-  const go = () => (mode === 'demo' ? run.demo(scenario) : run.live(scenario, chatCtx ? { context: chatCtx } : {}))
-  const pickScenario = (t: string) => {
-    t = t.toLowerCase()
-    return /\b(bet|betting|odds|sportsbook|sports)\b/.test(t) ? 'betting' : /a\/b|peeking|conversion|experiment/.test(t) ? 'ab_test'
-      : /patient|treatment|supplement|clinical|health/.test(t) ? 'health' : 'market'
-  }
-  const auditFromChat = (question: string, sources: any[]) => {
-    const ctx = { question, papers: sources.filter((s) => s.kind === 'paper') }
-    const sc = pickScenario(question + ' ' + ctx.papers.map((p) => p.title).join(' '))
-    setChatCtx(ctx); setScenario(sc); setMode('live'); open('court')
-    run.live(sc, { context: ctx })
-  }
+  const go = () => (mode === 'demo' ? run.demo(scenario) : run.live(scenario, {}))
   const showControls = tab === 'court' || tab === 'split'
   return (
     <div className="mx-auto max-w-[1500px] px-4 pb-16 pt-4">
@@ -74,16 +61,6 @@ export default function App() {
 
       {showControls && (
         <div className="card mb-4 flex flex-wrap items-center gap-3 p-3">
-          {chatCtx && (
-            <div className="flex w-full items-start gap-2 rounded-lg border border-accent/40 bg-accent/5 p-2 text-xs text-slate-200">
-              <div className="flex-1">
-                <b>Using your chat:</b> “{chatCtx.question.slice(0, 120)}” · {chatCtx.papers.length} paper(s) will be given to the Skeptics as evidence, and the AI will test the idea types your question mentions.
-                {scenario !== 'market' && scenario !== 'synthetic' && scenario !== 'equities' && <div className="text-amber-300">This example isn’t about stocks, so the papers are shown but not used in the checks.</div>}
-                {mode === 'demo' && <div className="text-amber-300">“Quick replay” ignores your chat. Switch to “Run for real” under Options.</div>}
-              </div>
-              <button className="btn px-2 py-0.5" onClick={() => setChatCtx(null)}>✕ remove</button>
-            </div>
-          )}
           <span className="text-sm text-slate-300">1. Pick an example</span>
           <select value={scenario} onChange={(e) => setScenario(e.target.value)} className="btn">{SCENARIOS.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}</select>
           <span className="text-sm text-slate-300">2.</span>
@@ -105,7 +82,6 @@ export default function App() {
       )}
 
       {/* Tabs stay mounted once opened, so switching tabs never loses a form, an upload or an in-progress search. */}
-      {seen.has('ask') && <div hidden={tab !== 'ask'}><ChatView onAudit={auditFromChat} /></div>}
       {seen.has('court') && <div hidden={tab !== 'court'}><CourtView s={s} /></div>}
       {seen.has('methods') && <div hidden={tab !== 'methods'}><MethodsView /></div>}
       {seen.has('split') && <div hidden={tab !== 'split'}><SplitView s={s} /></div>}

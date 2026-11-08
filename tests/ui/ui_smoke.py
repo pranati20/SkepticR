@@ -26,9 +26,7 @@ with sync_playwright() as p:
     low = pg.inner_text("body").lower()
     assert "valid findings used" in low or "no valid conclusion" in low, "conclusion missing"
     pg.screenshot(path=str(OUT / "conclude.png"), full_page=True)
-    pg.get_by_role("button", name="Find papers & data").click()
-    assert "ask a question in plain english" in pg.inner_text("body").lower(), "chat tab missing"
-    pg.screenshot(path=str(OUT / "ask.png"))
+    assert "find papers & data" not in pg.inner_text("body").lower(), "removed tab is back"
 
     # court: replay a recorded run
     pg.get_by_role("button", name="Watch it work").click()
