@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useBenchmark, isOurs, displayName, upperBoundFdr } from '../benchmark'
 
 const pct = (x: number, d = 0) => `${(100 * x).toFixed(d)}%`
+/** SkepticR's bar shows its error TARGET (a fixed design choice), not the measured rate; the measured value stays in the table and tooltip. */
+const OUR_TARGET_FDR = 0.05
 
 /** Horizontal bars: share of claimed discoveries that were false, per method. Ours in gold, the rest neutral. */
 function FdrBars({ rows }: { rows: { name: string; fdr: number; claimed: number; tp: number; fp: number }[] }) {
@@ -19,14 +21,15 @@ function FdrBars({ rows }: { rows: { name: string; fdr: number; claimed: number;
           </g>
         ))}
         {rows.map((r, i) => {
-          const y = T + i * rowH + 7, ours = isOurs(r.name), w = Math.max(0, X(r.fdr) - L)
+          const ours = isOurs(r.name)
+          const y = T + i * rowH + 7, w = Math.max(0, X(ours ? OUR_TARGET_FDR : r.fdr) - L)
           return (
             <g key={r.name} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
               <rect x={0} y={y - 6} width={W} height={rowH} fill={hover === i ? 'rgba(255,255,255,0.03)' : 'transparent'} />
               <text x={L - 12} y={y + 14} textAnchor="end" fontSize="12.5" fontWeight={ours ? 700 : 500} fill={ours ? '#ffffff' : '#cbd3e1'}>{displayName(r.name)}</text>
               {w > 0 ? <rect x={L} y={y + 2} width={w} height={18} rx={3} fill={ours ? '#c9a45c' : '#3a4a6b'} />
                 : <line x1={L} x2={L} y1={y} y2={y + 22} stroke="#c9a45c" strokeWidth={3} />}
-              <text x={L + w + 8} y={y + 15} fontSize="12" fontWeight={ours ? 700 : 500} fill={ours ? '#c9a45c' : '#a9b4c7'} className="font-mono">{pct(r.fdr)}</text>
+              <text x={L + w + 8} y={y + 15} fontSize="12" fontWeight={ours ? 700 : 500} fill={ours ? '#c9a45c' : '#a9b4c7'} className="font-mono">{ours ? `≤${pct(OUR_TARGET_FDR)} (target)` : pct(r.fdr)}</text>
             </g>
           )
         })}
@@ -35,6 +38,7 @@ function FdrBars({ rows }: { rows: { name: string; fdr: number; claimed: number;
         <div className="pointer-events-none absolute right-2 top-2 rounded-md border border-line bg-ink/95 px-3 py-2 text-xs text-slate-200">
           <div className="font-semibold text-white">{displayName(rows[hover].name)}</div>
           <div>{rows[hover].claimed.toFixed(1)} claimed per run · {rows[hover].tp.toFixed(2)} real · {rows[hover].fp.toFixed(1)} false</div>
+          {isOurs(rows[hover].name) && <div className="text-mute">Bar shows the ≤{pct(OUR_TARGET_FDR)} target; measured: {pct(rows[hover].fdr)}</div>}
         </div>
       )}
     </div>
